@@ -4,6 +4,7 @@ Action handler for executing commands based on detected gestures.
 import pyautogui
 import logging
 import time
+import subprocess
 from typing import Optional
 
 
@@ -38,27 +39,51 @@ class ActionHandler:
 
     def activate_voice_dictation(self) -> bool:
         """
-        Activate macOS voice dictation by simulating Fn+Fn key press.
+        Activate macOS voice dictation using Apple Shortcuts and type the result.
 
-        Note: This toggles dictation on/off.
+        Note: This requires a Quick Action shortcut named "Dictate Text"
+        to be created in the Shortcuts app that uses the "Dictate Text" action.
 
         Returns:
             True if successful
         """
         try:
-            # Toggle dictation state
-            self.dictation_active = not self.dictation_active
+            self.logger.info("Action: Activating voice dictation via Shortcuts")
 
-            self.logger.info(f"Action: {'Activating' if self.dictation_active else 'Deactivating'} voice dictation")
+            # Run the Apple Shortcut to trigger dictation
+            # The shortcut will wait for speech and return the transcribed text
+            result = subprocess.run(
+                ['shortcuts', 'run', 'Dictate Text'],
+                capture_output=True,
+                text=True,
+                timeout=30  # Give user time to speak
+            )
 
-            # Simulate Fn key press twice
-            # On macOS, the Fn key simulation might not work directly with pyautogui
-            # We'll use the keyboard shortcut approach
-            pyautogui.press('fn')
-            time.sleep(0.2)
-            pyautogui.press('fn')
+            if result.returncode == 0:
+                # Get the dictated text from stdout
+                dictated_text = result.stdout.strip()
 
-            return True
+                if dictated_text:
+                    self.logger.info(f"Dictated text: {dictated_text[:50]}...")
+
+                    # Type the dictated text into the active window
+                    pyautogui.write(dictated_text, interval=0.02)
+
+                    self.logger.info("Successfully typed dictated text")
+                    return True
+                else:
+                    self.logger.warning("No text was dictated")
+                    return False
+            else:
+                self.logger.error(f"Shortcut failed: {result.stderr}")
+                return False
+
+        except subprocess.TimeoutExpired:
+            self.logger.warning("Dictation timed out (took longer than 30 seconds)")
+            return False
+        except FileNotFoundError:
+            self.logger.error("shortcuts command not found - is this macOS Monterey or later?")
+            return False
         except Exception as e:
             self.logger.error(f"Failed to activate voice dictation: {e}")
             return False
