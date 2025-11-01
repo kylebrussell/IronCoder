@@ -1,0 +1,22 @@
+clutch:
+  hand: left
+  gesture: closed_fist
+  require_stable_frames: 5
+
+gestures:
+  open_palm: voice_dictation
+  peace_sign: double_escape
+  thumbs_up: git_push
+  pointing: approve_yes
+
+settings:
+  confidence_threshold: 0.7
+  cooldown_ms: 500
+  require_terminal_focus: true
+  camera_resolution: [640, 480]
+  camera_fps: 20
+
+visual_feedback:
+  show_overlay: true
+  clutch_indicator_color: [0, 255, 0]  # Green when engaged
+  clutch_disengaged_color: [255, 0, 0]  # Red when disengaged
