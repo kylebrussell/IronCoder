@@ -6,8 +6,8 @@ clutch:
 gestures:
   open_palm: voice_dictation
   peace_sign: double_escape
-  thumbs_up: git_push
-  pointing: approve_yes
+  thumbs_up: start_dev_server
+  pointing: stop_dev_server
 
 settings:
   confidence_threshold: 0.7

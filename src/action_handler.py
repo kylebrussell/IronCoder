@@ -124,6 +124,44 @@ class ActionHandler:
             self.logger.error(f"Failed to send git commit+push: {e}")
             return False
 
+    def start_dev_server(self) -> bool:
+        """
+        Type 'start the dev server' command and press Enter.
+
+        This tells Claude Code to start the development server for the current project.
+
+        Returns:
+            True if successful
+        """
+        try:
+            self.logger.info("Action: Sending 'start the dev server' command")
+            pyautogui.write('start the dev server', interval=0.05)
+            time.sleep(0.1)
+            pyautogui.press('enter')
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to send start dev server: {e}")
+            return False
+
+    def stop_dev_server(self) -> bool:
+        """
+        Type 'kill the running server' command and press Enter.
+
+        This tells Claude Code to stop the currently running development server.
+
+        Returns:
+            True if successful
+        """
+        try:
+            self.logger.info("Action: Sending 'kill the running server' command")
+            pyautogui.write('kill the running server', interval=0.05)
+            time.sleep(0.1)
+            pyautogui.press('enter')
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to send stop dev server: {e}")
+            return False
+
     def execute_gesture_action(self, gesture: str) -> Optional[str]:
         """
         Execute the appropriate action for a detected gesture.
@@ -135,10 +173,10 @@ class ActionHandler:
             Human-readable description of the action taken, or None if no action
         """
         action_map = {
-            'open_palm': (self.activate_voice_dictation, "Voice Dictation Toggled"),
+            'open_palm': (self.activate_voice_dictation, "Voice Dictation"),
             'peace_sign': (self.send_escape_escape, "Input Cleared"),
-            'thumbs_up': (self.git_commit_push, "Commit & Push"),
-            'pointing': (self.send_yes_enter, "Approved Next Steps")
+            'thumbs_up': (self.start_dev_server, "Start Dev Server"),
+            'pointing': (self.stop_dev_server, "Stop Dev Server")
         }
 
         if gesture in action_map:

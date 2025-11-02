@@ -7,7 +7,7 @@ A macOS utility that uses webcam-based hand gesture recognition to trigger commo
 
 - **Dual-Hand Gesture System**: Left hand for clutch engagement, right hand for commands
 - **Zero Accidental Triggers**: Clutch mechanism prevents unintended gesture activation
-- **4 Core Gestures**: Voice dictation, clear input, commit & push, approve next steps
+- **4 Core Gestures**: Voice dictation, clear input, start dev server, stop dev server
 - **Visual Feedback**: Real-time on-screen indicators for clutch status and detected gestures
 - **Terminal Focus Detection**: Only active when Terminal/iTerm is focused (configurable)
 - **Highly Configurable**: YAML-based configuration for all settings
@@ -21,8 +21,8 @@ A macOS utility that uses webcam-based hand gesture recognition to trigger commo
 ### Right Hand: Commands (only active when clutch engaged)
 1. **Open Palm (5 fingers)** → Toggle voice dictation
 2. **Peace Sign (2 fingers)** → Send Esc+Esc (clear input)
-3. **Thumbs Up** → Send "commit and push" + Enter
-4. **Pointing Finger** → Send "Yes, proceed to the next steps" + Enter
+3. **Thumbs Up** → Send "start the dev server" + Enter
+4. **Pointing Finger** → Send "kill the running server" + Enter
 
 ## Installation
 
@@ -89,8 +89,8 @@ clutch:
 gestures:
   open_palm: voice_dictation
   peace_sign: double_escape
-  thumbs_up: git_push
-  pointing: approve_yes
+  thumbs_up: start_dev_server
+  pointing: stop_dev_server
 
 settings:
   confidence_threshold: 0.7      # Hand detection confidence (0.0-1.0)
