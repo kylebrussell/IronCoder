@@ -1,5 +1,5 @@
 """
-Audio recording and transcription handler using whisper.cpp.
+Audio recording and transcription handler using faster-whisper.
 Records audio in background thread and provides streaming transcription.
 """
 
@@ -8,7 +8,7 @@ import queue
 import time
 import numpy as np
 import sounddevice as sd
-from pywhispercpp.model import Model
+from faster_whisper import WhisperModel
 from typing import Optional
 import logging
 
@@ -49,7 +49,9 @@ class AudioHandler:
         # Initialize Whisper model
         logger.info(f"Loading Whisper {model_name} model...")
         try:
-            self.model = Model(model_name, n_threads=4)
+            # faster-whisper uses CTranslate2 for efficient inference
+            # compute_type: int8 for speed, float16 for accuracy
+            self.model = WhisperModel(model_name, device="cpu", compute_type="int8")
             logger.info("Whisper model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load Whisper model: {e}")
@@ -121,12 +123,19 @@ class AudioHandler:
                     time.sleep(0.1)
 
                     # Check if we have enough audio to process a chunk
+                    should_process = False
                     with self.buffer_lock:
-                        if len(self.audio_buffer) >= self.chunk_size:
-                            self._process_chunk()
+                        buffer_size = len(self.audio_buffer)
+                        if buffer_size >= self.chunk_size:
+                            logger.info(f"📊 Buffer has {buffer_size} samples ({buffer_size/self.sample_rate:.1f}s), processing chunk...")
+                            should_process = True
+
+                    # Process chunk outside the lock to avoid deadlock
+                    if should_process:
+                        self._process_chunk()
 
         except Exception as e:
-            logger.error(f"Error in recording loop: {e}")
+            logger.error(f"❌ Error in recording loop: {e}", exc_info=True)
             with self.recording_lock:
                 self.recording = False
 
@@ -138,6 +147,9 @@ class AudioHandler:
         # Add audio data to buffer
         with self.buffer_lock:
             self.audio_buffer.extend(indata[:, 0].copy())
+            # Log buffer size every second
+            if len(self.audio_buffer) % self.sample_rate < frames:
+                logger.debug(f"🎤 Audio buffer: {len(self.audio_buffer)} samples ({len(self.audio_buffer)/self.sample_rate:.1f}s)")
 
     def _process_chunk(self):
         """Process accumulated audio chunk with Whisper."""
@@ -150,19 +162,42 @@ class AudioHandler:
             # Keep remaining audio in buffer for next chunk
             self.audio_buffer = self.audio_buffer[self.chunk_size:]
 
+        logger.info(f"🎙️  Processing {len(chunk)} samples ({len(chunk)/self.sample_rate:.1f}s) with Whisper...")
+
         # Transcribe chunk (this may take ~0.3-0.5s)
         try:
-            # Whisper expects audio normalized to [-1, 1]
-            # sounddevice already provides float32 in this range
-            text = self.model.transcribe(chunk, language='en')
+            # Ensure chunk is contiguous and properly formatted
+            chunk = np.ascontiguousarray(chunk, dtype=np.float32)
+
+            # Validate audio data
+            if not np.isfinite(chunk).all():
+                logger.error("❌ Audio chunk contains NaN or Inf values!")
+                return
+
+            # faster-whisper returns segments generator
+            segments, info = self.model.transcribe(
+                chunk,
+                language="en",
+                beam_size=1,  # Faster with beam_size=1
+                vad_filter=False,  # No VAD for real-time
+                without_timestamps=True  # Faster without timestamps
+            )
+
+            # Collect all segments into text
+            text_parts = [segment.text for segment in segments]
+            text = " ".join(text_parts).strip()
+
+            logger.info(f"🎙️  Whisper returned: '{text}'")
 
             # Only queue non-empty transcriptions
-            if text and text.strip():
-                self.text_queue.put(text.strip())
-                logger.info(f"Transcribed: {text.strip()}")
+            if text:
+                self.text_queue.put(text)
+                logger.info(f"✅ Transcribed: {text}")
+            else:
+                logger.info(f"⚠️  Whisper returned empty text (silence or noise)")
 
         except Exception as e:
-            logger.error(f"Error transcribing audio chunk: {e}")
+            logger.error(f"❌ Error transcribing audio chunk: {e}", exc_info=True)
 
     def _process_remaining_buffer(self):
         """Process any remaining audio in buffer when recording stops."""
@@ -177,10 +212,19 @@ class AudioHandler:
 
         # Transcribe final chunk
         try:
-            text = self.model.transcribe(chunk, language='en')
-            if text and text.strip():
-                self.text_queue.put(text.strip())
-                logger.info(f"Transcribed final chunk: {text.strip()}")
+            segments, info = self.model.transcribe(
+                chunk,
+                language="en",
+                beam_size=1,
+                vad_filter=False,
+                without_timestamps=True
+            )
+            text_parts = [segment.text for segment in segments]
+            text = " ".join(text_parts).strip()
+
+            if text:
+                self.text_queue.put(text)
+                logger.info(f"Transcribed final chunk: {text}")
 
         except Exception as e:
             logger.error(f"Error transcribing final chunk: {e}")

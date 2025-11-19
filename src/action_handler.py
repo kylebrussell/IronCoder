@@ -190,8 +190,9 @@ class ActionHandler:
             Human-readable description of the action taken, or None if no action
         """
         action_map = {
-            'peace_sign': (self.send_escape_escape, "Input Cleared"),
-            'thumbs_up': (self.start_dev_server, "Start Dev Server"),
+            'peace_sign': (self.start_dev_server, "Start Dev Server"),
+            'thumbs_up': (self.git_commit_push, "Commit & Push"),
+            'thumbs_down': (self.send_escape_escape, "Input Cleared"),
             'pointing': (self.stop_dev_server, "Stop Dev Server")
         }
 

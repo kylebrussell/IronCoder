@@ -27,6 +27,7 @@ class GeminiGestureDetector:
         'open_palm': 'All 5 fingers extended, palm facing forward',
         'peace_sign': 'Index and middle finger extended in V-shape, other fingers closed',
         'thumbs_up': 'Thumb pointing up, other fingers closed in fist',
+        'thumbs_down': 'Thumb pointing down, other fingers closed in fist',
         'pointing': 'Index finger extended pointing forward, other fingers closed',
         'none': 'No recognizable gesture or hand not visible'
     }

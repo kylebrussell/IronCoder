@@ -127,35 +127,139 @@ class VisualFeedback:
 
         height, width = frame.shape[:2]
 
-        # Draw semi-transparent background for hints
-        overlay = frame.copy()
-        hints_height = 150
-        cv2.rectangle(
-            overlay,
-            (0, height - hints_height),
-            (width, height),
-            (0, 0, 0),
-            -1
-        )
-        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
-
-        # Draw gesture hints
-        hints = [
-            "Open Palm: Voice Dictation",
-            "Peace Sign: Clear Input",
-            "Thumbs Up: Commit & Push",
-            "Pointing: Approve Next Steps"
+        # Define gestures with name, action, and color
+        gestures = [
+            ("OPEN PALM", "Voice Dictation", (147, 112, 219)),      # Medium purple
+            ("PEACE SIGN", "Start Dev Server", (46, 204, 113)),     # Green
+            ("THUMBS UP", "Commit & Push", (52, 152, 219)),         # Blue
+            ("THUMBS DOWN", "Clear Input", (231, 76, 60)),          # Red
+            ("POINTING", "Stop Dev Server", (230, 126, 34))         # Orange
         ]
 
-        y_start = height - hints_height + 30
-        for i, hint in enumerate(hints):
+        # Panel dimensions
+        panel_height = 220
+        panel_margin = 20
+        panel_y = height - panel_height - panel_margin
+
+        # Draw main background panel with gradient effect
+        overlay = frame.copy()
+
+        # Dark background
+        cv2.rectangle(
+            overlay,
+            (panel_margin, panel_y),
+            (width - panel_margin, height - panel_margin),
+            (30, 30, 40),  # Dark blue-grey
+            -1
+        )
+
+        # Add subtle border
+        cv2.rectangle(
+            overlay,
+            (panel_margin, panel_y),
+            (width - panel_margin, height - panel_margin),
+            (70, 70, 80),  # Light grey border
+            2
+        )
+
+        cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+
+        # Draw title
+        title = "GESTURE CONTROLS"
+        title_y = panel_y + 35
+        cv2.putText(
+            frame,
+            title,
+            (panel_margin + 20, title_y),
+            cv2.FONT_HERSHEY_DUPLEX,
+            0.7,
+            (255, 255, 255),
+            2
+        )
+
+        # Draw underline
+        cv2.line(
+            frame,
+            (panel_margin + 20, title_y + 8),
+            (width - panel_margin - 20, title_y + 8),
+            (100, 100, 120),
+            1
+        )
+
+        # Calculate card dimensions
+        num_gestures = len(gestures)
+        card_width = (width - 2 * panel_margin - 40 - (num_gestures - 1) * 10) // num_gestures
+        card_height = 120
+        card_y = panel_y + 70
+
+        # Draw gesture cards
+        for i, (gesture_name, action, color) in enumerate(gestures):
+            card_x = panel_margin + 20 + i * (card_width + 10)
+
+            # Draw card background
+            card_overlay = frame.copy()
+            cv2.rectangle(
+                card_overlay,
+                (card_x, card_y),
+                (card_x + card_width, card_y + card_height),
+                (50, 50, 60),  # Slightly lighter than panel
+                -1
+            )
+            cv2.addWeighted(card_overlay, 0.7, frame, 0.3, 0, frame)
+
+            # Draw colored top border
+            cv2.rectangle(
+                frame,
+                (card_x, card_y),
+                (card_x + card_width, card_y + 4),
+                color,
+                -1
+            )
+
+            # Draw gesture name (centered, larger)
+            name_y = card_y + 50
+            # Calculate text width for centering
+            (text_width, _), _ = cv2.getTextSize(
+                gesture_name,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                2
+            )
+            name_x = card_x + (card_width - text_width) // 2
             cv2.putText(
                 frame,
-                hint,
-                (10, y_start + i * 30),
+                gesture_name,
+                (name_x, name_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
+                0.5,
                 (255, 255, 255),
+                2
+            )
+
+            # Draw action text with icon-style separator
+            cv2.line(
+                frame,
+                (card_x + 10, name_y + 15),
+                (card_x + card_width - 10, name_y + 15),
+                (70, 70, 80),
+                1
+            )
+
+            action_y = name_y + 45
+            (text_width, _), _ = cv2.getTextSize(
+                action,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                1
+            )
+            action_x = card_x + (card_width - text_width) // 2
+            cv2.putText(
+                frame,
+                action,
+                (action_x, action_y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                color,
                 1
             )
 

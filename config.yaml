@@ -5,8 +5,9 @@ clutch:
 
 gestures:
   open_palm: voice_dictation
-  peace_sign: double_escape
-  thumbs_up: start_dev_server
+  peace_sign: start_dev_server
+  thumbs_up: commit_push
+  thumbs_down: clear_input
   pointing: stop_dev_server
 
 settings:
