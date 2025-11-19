@@ -1,250 +1,265 @@
 # IronCoder Gesture Control for Claude Code
 
-**Control Claude Code with hand gestures!**
-A macOS utility that uses webcam-based hand gesture recognition to trigger common Claude Code commands through intuitive hand movements.
+**Control Claude Code with hand gestures and voice!**
 
-## Features
+A macOS utility that combines AI-powered gesture recognition and voice transcription to control Claude Code through intuitive hand movements and speech.
 
-- **Dual-Hand Gesture System**: Left hand for clutch engagement, right hand for commands
-- **Zero Accidental Triggers**: Clutch mechanism prevents unintended gesture activation
-- **4 Core Gestures**: Voice dictation, clear input, start dev server, stop dev server
-- **Visual Feedback**: Real-time on-screen indicators for clutch status and detected gestures
-- **Terminal Focus Detection**: Only active when Terminal/iTerm is focused (configurable)
-- **Highly Configurable**: YAML-based configuration for all settings
+## ✨ Features
 
-## Gesture Commands
+- **🤖 AI-Powered Gestures**: Google Gemini Vision API for reliable gesture detection
+- **🎤 Voice Input**: Push-to-talk with real-time Whisper transcription
+- **👊 Dual-Hand System**: Left hand clutch + right hand gestures
+- **🎨 Beautiful UI**: Modern card-based overlay with color-coded controls
+- **⚡ Zero Accidental Triggers**: Clutch mechanism prevents unintended activation
+- **5 Core Gestures**: Voice, commit & push, clear input, start/stop server
+- **🔧 Highly Configurable**: YAML-based configuration for all settings
+
+## 🎮 Gesture Commands
 
 ### Left Hand: Clutch Control
 - **Closed Fist** → Clutch **ENGAGED** (enables right-hand gestures)
 - **Open/No gesture** → Clutch **DISENGAGED** (all gestures ignored)
 
 ### Right Hand: Commands (only active when clutch engaged)
-1. **Open Palm (5 fingers)** → Toggle voice dictation
-2. **Peace Sign (2 fingers)** → Send Esc+Esc (clear input)
-3. **Thumbs Up** → Send "start the dev server" + Enter
-4. **Pointing Finger** → Send "kill the running server" + Enter
 
-## Installation
+| Gesture | Action | Description |
+|---------|--------|-------------|
+| ✋ **Open Palm** | Voice Dictation | Push-to-talk: Hold to record, release to transcribe |
+| ✌️ **Peace Sign** | Start Dev Server | Types "start the dev server" + Enter |
+| 👍 **Thumbs Up** | Commit & Push | Types "commit and push" + Enter |
+| 👎 **Thumbs Down** | Clear Input | Sends Escape + Escape to clear input |
+| ☝️ **Pointing** | Stop Dev Server | Types "kill the running server" + Enter |
+
+## 📦 Installation
 
 ### Prerequisites
 - macOS (tested on macOS 10.15+)
-- Python 3.9+
+- Python 3.10+
 - Webcam
-- [uv](https://github.com/astral-sh/uv) package manager
+- Google Gemini API Key ([Get one free](https://aistudio.google.com/app/apikey))
 
 ### Setup
 
-1. **Clone or navigate to the project directory**:
+1. **Clone the repository**:
    ```bash
+   git clone <your-repo-url>
    cd gesture-control-claude
    ```
 
-2. **Install dependencies** (uv handles virtual environment automatically):
+2. **Install dependencies**:
    ```bash
-   uv sync
+   pip3 install -r requirements.txt
    ```
 
-3. **Grant camera permissions**:
+3. **Configure Gemini API key**:
+   Create a `.env.local` file:
+   ```bash
+   echo "GEMINI_API_KEY=your_api_key_here" > .env.local
+   ```
+
+4. **Grant camera permissions**:
    - System Settings → Privacy & Security → Camera
    - Allow Terminal/iTerm to access camera
 
-4. **Grant accessibility permissions** (for keyboard simulation):
+5. **Grant accessibility permissions** (for keyboard simulation):
    - System Settings → Privacy & Security → Accessibility
    - Add Terminal/iTerm to the list
 
-5. **Create dictation shortcut** (optional, for dictation gesture):
-   - Open **Shortcuts** app
-   - Create a new **Quick Action** shortcut named **"Dictate Text"**
-   - Add action: **"Dictate Text"** (search for it in actions)
-   - Save the shortcut
-   - Also enable dictation: System Settings → Keyboard → Dictation → Enable
+## 🚀 Usage
 
-## Usage
+### Running the App
 
-### Basic Usage
-
-Run the gesture control system:
 ```bash
-uv run python main.py
+python3 main.py
 ```
 
-### Quick Start
+### Quick Start Guide
 
-1. Launch the application
-2. Position your hands in front of the webcam
-3. **Close your left fist** to engage the clutch (green border appears)
-4. **Make right-hand gestures** to trigger commands
-5. Press `q` to quit, `h` to toggle hints
+1. **Launch** the application - webcam feed opens with overlay
+2. **Position hands** in front of the camera
+3. **Close left fist** to engage clutch (green border appears)
+4. **Make gestures** with your right hand:
+   - Hold **open palm** and speak, release when done
+   - Show **thumbs up** to commit and push
+   - Show **thumbs down** to clear input
+   - And more!
+5. **Press keys**:
+   - `h` - Toggle hints overlay
+   - `q` - Quit application
 
-### Configuration
+### Voice Input Tips
+
+- **Hold open palm** gesture while speaking
+- **Speak clearly** into your microphone
+- **Release gesture** when finished speaking
+- Text appears automatically in Claude Code input
+- Uses Whisper AI for accurate transcription
+
+## ⚙️ Configuration
 
 Edit `config.yaml` to customize settings:
 
 ```yaml
 clutch:
-  hand: left
+  hand: left                    # Which hand for clutch
   gesture: closed_fist
-  require_stable_frames: 5  # Frames required for stable detection
+  require_stable_frames: 5      # Stability threshold
 
 gestures:
   open_palm: voice_dictation
-  peace_sign: double_escape
-  thumbs_up: start_dev_server
+  peace_sign: start_dev_server
+  thumbs_up: commit_push
+  thumbs_down: clear_input
   pointing: stop_dev_server
 
 settings:
-  confidence_threshold: 0.7      # Hand detection confidence (0.0-1.0)
-  cooldown_ms: 500               # Milliseconds between gesture triggers
-  require_terminal_focus: true   # Only work when Terminal is focused
-  camera_resolution: [640, 480]  # Camera resolution
-  camera_fps: 20                 # Camera frame rate
+  confidence_threshold: 0.7     # Hand detection confidence
+  cooldown_ms: 500              # Delay between gestures
+  require_terminal_focus: false # Terminal focus requirement
+  camera_resolution: [640, 480]
+  camera_fps: 20
 
-visual_feedback:
-  show_overlay: true
-  clutch_indicator_color: [0, 255, 0]      # Green (BGR format)
-  clutch_disengaged_color: [255, 0, 0]     # Red (BGR format)
+gemini:
+  model: gemini-2.5-flash       # Gemini model to use
+  sample_interval: 0.5          # Seconds between API calls
+  stability_frames: 2           # Consecutive detections needed
+  resize_width: 512             # Image width sent to API
 ```
 
-## How It Works
-
-### Architecture
+## 🏗️ Architecture
 
 ```
-Webcam Feed → MediaPipe Hand Tracking → Dual Hand Detection
-                                              ↓
-                      ↓                                           ↓
-            Left Hand (Clutch)                          Right Hand (Gestures)
-                      ↓                                           ↓
-              ClutchDetector                         CommandGestureRecognizer
-                      ↓                                           ↓
-                      ←─────────────────┬─────────────────────────┘
-                                        ↓
-                      If clutch engaged & terminal focused
-                                        ↓
-                                 ActionHandler
-                                        ↓
-                                 Execute Command
+Webcam Feed
+    ↓
+MediaPipe Hand Tracking (Clutch Detection)
+    ↓
+Google Gemini Vision API (Gesture Recognition)
+    ↓
+Action Handler
+    ├─→ Whisper AI (Voice Transcription)
+    └─→ PyAutoGUI (Keyboard Simulation)
 ```
 
-### Components
+### Key Components
 
-- **HandTracker**: MediaPipe wrapper for dual hand detection and landmark extraction
-- **ClutchDetector**: Detects closed fist on left hand with frame smoothing
-- **CommandGestureRecognizer**: Recognizes 4 right-hand gestures with debouncing
-- **ActionHandler**: Executes system commands via pyautogui
-- **WindowManager**: Detects active Terminal window (macOS)
-- **VisualFeedback**: Renders on-screen overlays and indicators
+- **HandTracker**: MediaPipe wrapper for clutch detection
+- **ClutchDetector**: Detects closed fist on left hand
+- **GeminiGestureDetector**: AI-powered gesture recognition using Gemini Vision
+- **AudioHandler**: Real-time audio recording and Whisper transcription
+- **ActionHandler**: Executes commands and manages voice input
+- **VisualFeedback**: Beautiful card-based UI overlay
 
-### Safety Features
+### Technology Stack
 
-1. **Clutch Mechanism**: Gestures only processed when left fist is closed
-2. **Terminal Focus Check**: Only active when Terminal/iTerm is focused
-3. **Frame Smoothing**: Requires stable gesture over multiple frames
-4. **Cooldown Period**: Prevents rapid double-triggers
-5. **Hand Loss Reset**: Resets state when hands leave frame
+- **[Google Gemini Vision API](https://ai.google.dev/)** - Gesture detection
+- **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** - Speech-to-text
+- **[MediaPipe](https://mediapipe.dev/)** - Hand tracking for clutch
+- **[OpenCV](https://opencv.org/)** - Computer vision
+- **[PyAutoGUI](https://pyautogui.readthedocs.io/)** - Keyboard automation
 
-## Development
+## 🔒 Safety Features
 
-### Project Structure
+1. **Clutch Mechanism**: Gestures only work when left fist is closed
+2. **Frame Smoothing**: Requires stable gesture over multiple frames
+3. **Cooldown Period**: Prevents rapid double-triggers
+4. **Hand Loss Reset**: Resets state when hands leave frame
+5. **API Rate Limiting**: Gemini calls throttled to 0.5s intervals
+
+## 🐛 Troubleshooting
+
+### Gestures Not Triggering
+- ✅ Ensure clutch (left fist) is engaged (green border)
+- ✅ Make gestures clearly in front of camera
+- ✅ Check camera permissions granted
+- ✅ Verify `.env.local` has valid Gemini API key
+- ✅ Try adjusting `confidence_threshold` in config
+
+### Voice Input Not Working
+- ✅ Hold open palm gesture while speaking
+- ✅ Ensure microphone is working
+- ✅ Check for "🎙️ Processing..." logs
+- ✅ Verify faster-whisper installed: `pip3 show faster-whisper`
+- ✅ Wait 3 seconds before releasing gesture (chunk processing)
+
+### Gemini API Issues
+- ✅ Check API key in `.env.local`
+- ✅ Verify API quota: [Google AI Studio](https://aistudio.google.com/)
+- ✅ Look for "📡 Sending frame to Gemini API..." in logs
+- ✅ Check internet connection
+
+### Poor Gesture Detection
+- ✅ Improve lighting conditions
+- ✅ Make gestures clearly and deliberately
+- ✅ Reduce `gemini.sample_interval` for faster detection
+- ✅ Decrease `gemini.stability_frames` for quicker response
+
+### High CPU Usage
+- ✅ Lower camera resolution in config
+- ✅ Reduce camera FPS
+- ✅ Increase `gemini.sample_interval` (fewer API calls)
+- ✅ Close other applications
+
+## 📁 Project Structure
 
 ```
 gesture-control-claude/
-├── main.py                     # Entry point
-├── config.yaml                 # Configuration
-├── pyproject.toml              # Project metadata
+├── main.py                         # Entry point
+├── config.yaml                     # Configuration
+├── requirements.txt                # Dependencies
+├── .env.local                      # API keys (create this)
 ├── src/
-│   ├── hand_tracker.py         # MediaPipe hand tracking
-│   ├── clutch_detector.py      # Left hand clutch detection
-│   ├── gesture_recognizer.py   # Right hand gesture recognition
-│   ├── action_handler.py       # Command execution
+│   ├── hand_tracker.py             # MediaPipe hand tracking
+│   ├── clutch_detector.py          # Left hand clutch detection
+│   ├── gemini_gesture_detector.py  # Gemini-powered gesture recognition
+│   ├── audio_handler.py            # Whisper audio transcription
+│   ├── action_handler.py           # Command execution
 │   └── utils/
-│       ├── window_manager.py   # Window focus detection
-│       └── visual_feedback.py  # Visual overlays
+│       ├── window_manager.py       # Window focus detection
+│       └── visual_feedback.py      # Beautiful UI overlays
 └── README.md
 ```
 
-### Running Tests
+## 🔮 Future Enhancements
 
-Currently, testing is manual:
-1. Test clutch engagement/disengagement
-2. Test each gesture individually
-3. Verify no gestures fire without clutch
-4. Test rapid gesture switching
-5. Check performance (CPU/memory)
+- [ ] Custom gesture training via Gemini fine-tuning
+- [ ] Gesture chaining for complex commands
+- [ ] Right-hand clutch option for left-handed users
+- [ ] Background service mode (menu bar app)
+- [ ] Multi-language voice support
+- [ ] Gesture macros/shortcuts
+- [ ] Linux/Windows support
+
+## 📝 Development Notes
+
+### Adding New Gestures
+
+1. Add gesture description to `GeminiGestureDetector.GESTURES`
+2. Add action method to `ActionHandler`
+3. Map gesture to action in `action_handler.py`
+4. Update `config.yaml` gesture mappings
+5. Update visual feedback hints in `visual_feedback.py`
 
 ### Performance Optimization
 
-- Camera resolution: 640x480 (balances accuracy and performance)
-- Frame rate: 20fps (reduces CPU load)
-- MediaPipe confidence: 0.7 (filters noisy detections)
-- Gesture confidence: 3-5 frames (smoothing vs. responsiveness)
+- Camera: 640x480 @ 20fps (balances accuracy and performance)
+- Gemini: 0.5s intervals with 512px images (manages API costs)
+- Whisper: int8 quantization for faster inference
+- MediaPipe: 0.7 confidence threshold (filters noise)
 
-## Troubleshooting
-
-### Gestures Not Triggering
-- Ensure clutch (left fist) is engaged (green border)
-- Check Terminal is the active window
-- Verify camera permissions granted
-- Try adjusting `confidence_threshold` in config
-- Increase `require_stable_frames` for more stability
-
-### Gestures Triggering Accidentally
-- Increase `cooldown_ms` in config
-- Increase `require_stable_frames` for stricter detection
-- Keep hands out of frame when not in use
-
-### Poor Hand Detection
-- Improve lighting conditions
-- Reduce background clutter
-- Keep hands within camera view
-- Clean camera lens
-- Lower `confidence_threshold` (may increase false positives)
-
-### Voice Dictation Not Working
-- Create the "Dictate Text" Quick Action in Shortcuts app
-- Enable dictation in System Settings → Keyboard
-- Test the shortcut manually: `shortcuts run "Dictate Text"`
-- Ensure Terminal.app is the active focused window
-- Check logs for "Successfully triggered Dictate Text shortcut"
-
-### High CPU Usage
-- Lower camera resolution in config
-- Reduce camera FPS
-- Close other applications
-- Check Activity Monitor for MediaPipe process
-
-## Known Limitations
-
-- **macOS Only**: Uses macOS-specific APIs for window management
-- **Shortcuts Setup**: Requires creating a "Dictate Text" Quick Action in Shortcuts app
-- **Lighting**: Hand detection accuracy depends on lighting conditions
-- **Camera Position**: Requires hands to be visible and facing camera
-- **Performance**: Real-time hand tracking is CPU-intensive
-
-## Future Enhancements
-
-- [ ] Linux/Windows support
-- [ ] Custom gesture mapping via UI
-- [ ] Gesture recording/replay
-- [ ] Right-hand clutch option for left-handed users
-- [ ] Integration with Claude Code API (if available)
-- [ ] Background service mode (menu bar app)
-- [ ] Gesture chaining for complex commands
-- [ ] Alternative clutch gestures
-
-## Credits
+## 🙏 Credits
 
 Built with:
+- [Google Gemini Vision API](https://ai.google.dev/) - AI gesture detection
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - Speech-to-text
 - [MediaPipe](https://mediapipe.dev/) - Hand tracking
 - [OpenCV](https://opencv.org/) - Computer vision
 - [PyAutoGUI](https://pyautogui.readthedocs.io/) - Keyboard automation
-- [uv](https://github.com/astral-sh/uv) - Python package management
 
-## License
+## 📄 License
 
 MIT License - See LICENSE file for details
 
-## Support
+## 💬 Support
 
 For issues, questions, or contributions, please open an issue on GitHub.
 
