@@ -12,7 +12,7 @@ gestures:
 settings:
   confidence_threshold: 0.7
   cooldown_ms: 500
-  require_terminal_focus: true
+  require_terminal_focus: false  # Set to true to only allow gestures when terminal is focused
   camera_resolution: [640, 480]
   camera_fps: 20
 
@@ -20,3 +20,10 @@ visual_feedback:
   show_overlay: true
   clutch_indicator_color: [0, 255, 0]  # Green when engaged
   clutch_disengaged_color: [255, 0, 0]  # Red when disengaged
+
+# Gemini Vision API settings for gesture detection
+gemini:
+  model: gemini-2.5-flash  # Latest fast vision model
+  sample_interval: 0.5  # Send frame to Gemini every 0.5 seconds
+  stability_frames: 2  # Require 2 consecutive detections before confirming gesture
+  resize_width: 512  # Resize frame width before sending (saves API costs)

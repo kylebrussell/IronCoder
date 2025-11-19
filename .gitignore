@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment variables (contains API keys)
+.env
+.env.local
+.env.*.local

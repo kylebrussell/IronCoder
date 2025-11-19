@@ -5,12 +5,16 @@ Main entry point for the gesture control system.
 import cv2
 import yaml
 import logging
+from dotenv import load_dotenv
 from src.hand_tracker import HandTracker
 from src.clutch_detector import ClutchDetector
-from src.gesture_recognizer import CommandGestureRecognizer
+from src.gemini_gesture_detector import GeminiGestureDetector
 from src.action_handler import ActionHandler
 from src.utils.window_manager import WindowManager
 from src.utils.visual_feedback import VisualFeedback
+
+# Load environment variables from .env.local
+load_dotenv('.env.local')
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
@@ -46,6 +50,12 @@ def main():
     require_stable_frames = config.get('clutch', {}).get('require_stable_frames', 5)
     show_overlay = config.get('visual_feedback', {}).get('show_overlay', True)
 
+    # Gemini settings
+    gemini_model = config.get('gemini', {}).get('model', 'gemini-2.0-flash-exp')
+    gemini_sample_interval = config.get('gemini', {}).get('sample_interval', 0.5)
+    gemini_stability_frames = config.get('gemini', {}).get('stability_frames', 2)
+    gemini_resize_width = config.get('gemini', {}).get('resize_width', 512)
+
     # Get visual feedback colors
     clutch_engaged_color = tuple(config.get('visual_feedback', {}).get('clutch_indicator_color', [0, 255, 0]))
     clutch_disengaged_color = tuple(config.get('visual_feedback', {}).get('clutch_disengaged_color', [255, 0, 0]))
@@ -56,6 +66,8 @@ def main():
     logger.info(f"Cooldown: {cooldown_ms}ms")
     logger.info(f"Require terminal focus: {require_terminal_focus}")
     logger.info(f"Clutch stable frames: {require_stable_frames}")
+    logger.info(f"Gemini model: {gemini_model}")
+    logger.info(f"Gemini sample interval: {gemini_sample_interval}s")
 
     # Initialize components
     hand_tracker = HandTracker(
@@ -63,10 +75,22 @@ def main():
         min_detection_confidence=confidence_threshold
     )
     clutch_detector = ClutchDetector(require_stable_frames=require_stable_frames)
-    gesture_recognizer = CommandGestureRecognizer(
-        confidence_frames=require_stable_frames,
-        cooldown_ms=cooldown_ms
-    )
+
+    # Initialize Gemini gesture detector
+    try:
+        gesture_detector = GeminiGestureDetector(
+            model_name=gemini_model,
+            sample_interval=gemini_sample_interval,
+            stability_frames=gemini_stability_frames,
+            cooldown_ms=cooldown_ms,
+            resize_width=gemini_resize_width
+        )
+        logger.info("Gemini gesture detector initialized")
+    except ValueError as e:
+        logger.error(f"Failed to initialize Gemini: {e}")
+        logger.error("Make sure GEMINI_API_KEY environment variable is set")
+        return
+
     action_handler = ActionHandler()
     window_manager = WindowManager()
     visual_feedback = VisualFeedback(
@@ -91,6 +115,7 @@ def main():
     show_hints = True
     action_feedback_text = None
     action_feedback_timer = 0
+    previous_gesture = None  # Track previous gesture for push-to-talk
 
     try:
         while True:
@@ -114,25 +139,53 @@ def main():
 
             # Only process gestures if clutch is engaged
             triggered_gesture = None
+            current_gesture = None
             if clutch_engaged:
                 # Check if terminal is focused (if required)
                 terminal_focused = not require_terminal_focus or window_manager.is_terminal_active()
 
-                if terminal_focused:
-                    # Update gesture recognizer with right hand
-                    triggered_gesture = gesture_recognizer.update(right_hand)
+                if not terminal_focused:
+                    logger.info("🖥️  Terminal not focused - gestures disabled (set require_terminal_focus: false in config to disable this check)")
+                else:
+                    # Update Gemini gesture detector with full frame
+                    # (Gemini needs the image, not just hand landmarks)
+                    triggered_gesture = gesture_detector.update(frame)
 
-                    # Execute action if gesture was triggered
-                    if triggered_gesture:
+                    # Get current gesture state (not just newly triggered)
+                    current_gesture = gesture_detector.get_status()['current_gesture']
+
+                    # Handle push-to-talk for open_palm gesture
+                    if current_gesture == 'open_palm' and previous_gesture != 'open_palm':
+                        # Open palm just started - begin recording
+                        if action_handler.start_recording():
+                            action_feedback_text = "Recording..."
+                            action_feedback_timer = 9999  # Keep showing while recording
+                    elif previous_gesture == 'open_palm' and current_gesture != 'open_palm':
+                        # Open palm just ended - stop recording
+                        action_handler.stop_recording()
+                        action_feedback_text = None
+                        action_feedback_timer = 0
+
+                    # Execute action if non-voice gesture was triggered
+                    if triggered_gesture and triggered_gesture != 'open_palm':
                         action_text = action_handler.execute_gesture_action(triggered_gesture)
                         if action_text:
                             action_feedback_text = action_text
                             action_feedback_timer = 60  # Show for 60 frames (~2 seconds at 30fps)
-                else:
-                    logger.debug("Terminal not focused - gestures disabled")
             else:
-                # Reset gesture recognizer when clutch is disengaged
-                gesture_recognizer.reset()
+                # Reset gesture detector when clutch is disengaged
+                gesture_detector.reset()
+                # Stop recording if clutch is disengaged
+                if action_handler.is_dictation_active():
+                    action_handler.stop_recording()
+                    action_feedback_text = None
+                    action_feedback_timer = 0
+
+            # Update previous gesture for next iteration
+            previous_gesture = current_gesture
+
+            # Process any transcribed text from the queue (streaming)
+            action_handler.process_transcription_queue()
 
             # Reset hand detection if no hands found
             if left_hand is None:
@@ -144,11 +197,11 @@ def main():
                 visual_feedback.draw_clutch_indicator(processed_frame, clutch_engaged)
 
                 # Draw status text
-                current_gesture = gesture_recognizer.get_status()['current_gesture']
+                status_gesture = gesture_detector.get_status()['current_gesture']
                 visual_feedback.draw_status_text(
                     processed_frame,
                     clutch_engaged,
-                    current_gesture
+                    status_gesture
                 )
 
                 # Draw gesture hints
@@ -188,6 +241,7 @@ def main():
         logger.error(f"Error during execution: {e}", exc_info=True)
     finally:
         # Clean up
+        action_handler.cleanup()
         cap.release()
         cv2.destroyAllWindows()
         hand_tracker.close()

@@ -4,8 +4,8 @@ Action handler for executing commands based on detected gestures.
 import pyautogui
 import logging
 import time
-import subprocess
 from typing import Optional
+from src.audio_handler import AudioHandler
 
 
 class ActionHandler:
@@ -14,11 +14,18 @@ class ActionHandler:
     def __init__(self):
         """Initialize action handler."""
         self.logger = logging.getLogger(__name__)
-        self.dictation_active = False
 
         # Set PyAutoGUI settings for safety
         pyautogui.PAUSE = 0.1  # Pause between actions
         pyautogui.FAILSAFE = True  # Move mouse to corner to abort
+
+        # Initialize audio handler for voice input
+        try:
+            self.audio_handler = AudioHandler(model_name="small")
+            self.logger.info("Audio handler initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize audio handler: {e}")
+            self.audio_handler = None
 
     def send_escape_escape(self) -> bool:
         """
@@ -37,56 +44,64 @@ class ActionHandler:
             self.logger.error(f"Failed to send double-escape: {e}")
             return False
 
-    def activate_voice_dictation(self) -> bool:
+    def start_recording(self) -> bool:
         """
-        Activate macOS voice dictation using Apple Shortcuts and type the result.
-
-        Note: This requires a Quick Action shortcut named "Dictate Text"
-        to be created in the Shortcuts app that uses the "Dictate Text" action.
+        Start recording audio for voice input (push-to-talk).
+        Non-blocking - recording happens in background thread.
 
         Returns:
-            True if successful
+            True if recording started successfully
         """
+        if not self.audio_handler:
+            self.logger.error("Audio handler not initialized")
+            return False
+
         try:
-            self.logger.info("Action: Activating voice dictation via Shortcuts")
-
-            # Run the Apple Shortcut to trigger dictation
-            # The shortcut will wait for speech and return the transcribed text
-            result = subprocess.run(
-                ['shortcuts', 'run', 'Dictate Text'],
-                capture_output=True,
-                text=True,
-                timeout=30  # Give user time to speak
-            )
-
-            if result.returncode == 0:
-                # Get the dictated text from stdout
-                dictated_text = result.stdout.strip()
-
-                if dictated_text:
-                    self.logger.info(f"Dictated text: {dictated_text[:50]}...")
-
-                    # Type the dictated text into the active window
-                    pyautogui.write(dictated_text, interval=0.02)
-
-                    self.logger.info("Successfully typed dictated text")
-                    return True
-                else:
-                    self.logger.warning("No text was dictated")
-                    return False
-            else:
-                self.logger.error(f"Shortcut failed: {result.stderr}")
-                return False
-
-        except subprocess.TimeoutExpired:
-            self.logger.warning("Dictation timed out (took longer than 30 seconds)")
-            return False
-        except FileNotFoundError:
-            self.logger.error("shortcuts command not found - is this macOS Monterey or later?")
-            return False
+            self.audio_handler.start_recording()
+            self.logger.info("Action: Started voice recording (push-to-talk)")
+            return True
         except Exception as e:
-            self.logger.error(f"Failed to activate voice dictation: {e}")
+            self.logger.error(f"Failed to start recording: {e}")
             return False
+
+    def stop_recording(self) -> bool:
+        """
+        Stop recording audio and process final chunk.
+
+        Returns:
+            True if recording stopped successfully
+        """
+        if not self.audio_handler:
+            return False
+
+        try:
+            self.audio_handler.stop_recording()
+            self.logger.info("Action: Stopped voice recording")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to stop recording: {e}")
+            return False
+
+    def process_transcription_queue(self):
+        """
+        Check for new transcribed text and type it immediately.
+        Should be called frequently from main loop to enable streaming.
+        """
+        if not self.audio_handler:
+            return
+
+        # Process all available transcriptions
+        while True:
+            text = self.audio_handler.get_transcribed_text()
+            if text is None:
+                break
+
+            # Type the transcribed chunk immediately
+            try:
+                self.logger.info(f"Typing transcription: {text[:50]}...")
+                pyautogui.write(text + " ", interval=0.02)  # Add space between chunks
+            except Exception as e:
+                self.logger.error(f"Failed to type transcription: {e}")
 
     def send_yes_enter(self) -> bool:
         """
@@ -166,6 +181,8 @@ class ActionHandler:
         """
         Execute the appropriate action for a detected gesture.
 
+        Note: open_palm is handled separately in main loop for push-to-talk behavior.
+
         Args:
             gesture: Gesture name from CommandGestureRecognizer
 
@@ -173,7 +190,6 @@ class ActionHandler:
             Human-readable description of the action taken, or None if no action
         """
         action_map = {
-            'open_palm': (self.activate_voice_dictation, "Voice Dictation"),
             'peace_sign': (self.send_escape_escape, "Input Cleared"),
             'thumbs_up': (self.start_dev_server, "Start Dev Server"),
             'pointing': (self.stop_dev_server, "Stop Dev Server")
@@ -195,6 +211,13 @@ class ActionHandler:
         Check if dictation is currently active.
 
         Returns:
-            True if dictation is active
+            True if audio recording is active
         """
-        return self.dictation_active
+        if not self.audio_handler:
+            return False
+        return self.audio_handler.is_recording()
+
+    def cleanup(self):
+        """Clean up resources on shutdown."""
+        if self.audio_handler:
+            self.audio_handler.cleanup()
