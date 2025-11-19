@@ -4,17 +4,17 @@
 
 A macOS utility that combines AI-powered gesture recognition and voice transcription to control Claude Code through intuitive hand movements and speech.
 
-## ✨ Features
+## Features
 
-- **🤖 AI-Powered Gestures**: Google Gemini Vision API for reliable gesture detection
-- **🎤 Voice Input**: Push-to-talk with real-time Whisper transcription
-- **👊 Dual-Hand System**: Left hand clutch + right hand gestures
-- **🎨 Beautiful UI**: Modern card-based overlay with color-coded controls
-- **⚡ Zero Accidental Triggers**: Clutch mechanism prevents unintended activation
+- **AI-Powered Gestures**: Google Gemini Vision API for reliable gesture detection
+- **Voice Input**: Push-to-talk with real-time Whisper transcription
+- **Dual-Hand System**: Left hand clutch + right hand gestures
+- **Beautiful UI**: Modern card-based overlay with color-coded controls
+- **Zero Accidental Triggers**: Clutch mechanism prevents unintended activation
 - **5 Core Gestures**: Voice, commit & push, clear input, start/stop server
-- **🔧 Highly Configurable**: YAML-based configuration for all settings
+- **Highly Configurable**: YAML-based configuration for all settings
 
-## 🎮 Gesture Commands
+## Gesture Commands
 
 ### Left Hand: Clutch Control
 - **Closed Fist** → Clutch **ENGAGED** (enables right-hand gestures)
@@ -24,13 +24,13 @@ A macOS utility that combines AI-powered gesture recognition and voice transcrip
 
 | Gesture | Action | Description |
 |---------|--------|-------------|
-| ✋ **Open Palm** | Voice Dictation | Push-to-talk: Hold to record, release to transcribe |
-| ✌️ **Peace Sign** | Start Dev Server | Types "start the dev server" + Enter |
-| 👍 **Thumbs Up** | Commit & Push | Types "commit and push" + Enter |
-| 👎 **Thumbs Down** | Clear Input | Sends Escape + Escape to clear input |
-| ☝️ **Pointing** | Stop Dev Server | Types "kill the running server" + Enter |
+| **Open Palm** | Voice Dictation | Push-to-talk: Hold to record, release to transcribe |
+| **Peace Sign** | Start Dev Server | Types "start the dev server" + Enter |
+| **Thumbs Up** | Commit & Push | Types "commit and push" + Enter |
+| **Thumbs Down** | Clear Input | Sends Escape + Escape to clear input |
+| **Pointing** | Stop Dev Server | Types "kill the running server" + Enter |
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 - macOS (tested on macOS 10.15+)
@@ -65,7 +65,7 @@ A macOS utility that combines AI-powered gesture recognition and voice transcrip
    - System Settings → Privacy & Security → Accessibility
    - Add Terminal/iTerm to the list
 
-## 🚀 Usage
+## Usage
 
 ### Running the App
 
@@ -95,7 +95,7 @@ python3 main.py
 - Text appears automatically in Claude Code input
 - Uses Whisper AI for accurate transcription
 
-## ⚙️ Configuration
+## Configuration
 
 Edit `config.yaml` to customize settings:
 
@@ -126,7 +126,7 @@ gemini:
   resize_width: 512             # Image width sent to API
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 Webcam Feed
@@ -157,7 +157,7 @@ Action Handler
 - **[OpenCV](https://opencv.org/)** - Computer vision
 - **[PyAutoGUI](https://pyautogui.readthedocs.io/)** - Keyboard automation
 
-## 🔒 Safety Features
+## Safety Features
 
 1. **Clutch Mechanism**: Gestures only work when left fist is closed
 2. **Frame Smoothing**: Requires stable gesture over multiple frames
@@ -165,41 +165,41 @@ Action Handler
 4. **Hand Loss Reset**: Resets state when hands leave frame
 5. **API Rate Limiting**: Gemini calls throttled to 0.5s intervals
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Gestures Not Triggering
-- ✅ Ensure clutch (left fist) is engaged (green border)
-- ✅ Make gestures clearly in front of camera
-- ✅ Check camera permissions granted
-- ✅ Verify `.env.local` has valid Gemini API key
-- ✅ Try adjusting `confidence_threshold` in config
+- Ensure clutch (left fist) is engaged (green border)
+- Make gestures clearly in front of camera
+- Check camera permissions granted
+- Verify `.env.local` has valid Gemini API key
+- Try adjusting `confidence_threshold` in config
 
 ### Voice Input Not Working
-- ✅ Hold open palm gesture while speaking
-- ✅ Ensure microphone is working
-- ✅ Check for "🎙️ Processing..." logs
-- ✅ Verify faster-whisper installed: `pip3 show faster-whisper`
-- ✅ Wait 3 seconds before releasing gesture (chunk processing)
+- Hold open palm gesture while speaking
+- Ensure microphone is working
+- Check for "Processing..." logs
+- Verify faster-whisper installed: `pip3 show faster-whisper`
+- Wait 3 seconds before releasing gesture (chunk processing)
 
 ### Gemini API Issues
-- ✅ Check API key in `.env.local`
-- ✅ Verify API quota: [Google AI Studio](https://aistudio.google.com/)
-- ✅ Look for "📡 Sending frame to Gemini API..." in logs
-- ✅ Check internet connection
+- Check API key in `.env.local`
+- Verify API quota: [Google AI Studio](https://aistudio.google.com/)
+- Look for "Sending frame to Gemini API..." in logs
+- Check internet connection
 
 ### Poor Gesture Detection
-- ✅ Improve lighting conditions
-- ✅ Make gestures clearly and deliberately
-- ✅ Reduce `gemini.sample_interval` for faster detection
-- ✅ Decrease `gemini.stability_frames` for quicker response
+- Improve lighting conditions
+- Make gestures clearly and deliberately
+- Reduce `gemini.sample_interval` for faster detection
+- Decrease `gemini.stability_frames` for quicker response
 
 ### High CPU Usage
-- ✅ Lower camera resolution in config
-- ✅ Reduce camera FPS
-- ✅ Increase `gemini.sample_interval` (fewer API calls)
-- ✅ Close other applications
+- Lower camera resolution in config
+- Reduce camera FPS
+- Increase `gemini.sample_interval` (fewer API calls)
+- Close other applications
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 gesture-control-claude/
@@ -219,7 +219,7 @@ gesture-control-claude/
 └── README.md
 ```
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
 - [ ] Custom gesture training via Gemini fine-tuning
 - [ ] Gesture chaining for complex commands
@@ -229,7 +229,7 @@ gesture-control-claude/
 - [ ] Gesture macros/shortcuts
 - [ ] Linux/Windows support
 
-## 📝 Development Notes
+## Development Notes
 
 ### Adding New Gestures
 
@@ -246,7 +246,7 @@ gesture-control-claude/
 - Whisper: int8 quantization for faster inference
 - MediaPipe: 0.7 confidence threshold (filters noise)
 
-## 🙏 Credits
+## Credits
 
 Built with:
 - [Google Gemini Vision API](https://ai.google.dev/) - AI gesture detection
@@ -255,14 +255,10 @@ Built with:
 - [OpenCV](https://opencv.org/) - Computer vision
 - [PyAutoGUI](https://pyautogui.readthedocs.io/) - Keyboard automation
 
-## 📄 License
+## License
 
 MIT License - See LICENSE file for details
 
-## 💬 Support
+## Support
 
 For issues, questions, or contributions, please open an issue on GitHub.
-
----
-
-**Made with Claude Code** 🤖
