@@ -1,43 +1,51 @@
 # IronCoder Gesture Control for Claude Code
 
-**Control Claude Code with hand gestures and voice!**
+Control Claude Code with hand gestures and voice.
 
 A macOS utility that combines AI-powered gesture recognition and voice transcription to control Claude Code through intuitive hand movements and speech.
 
 ## Features
 
+- **Native Tauri App**: Modern React + Tailwind UI with glass morphism effects
 - **Hybrid Gesture Detection**: Fast local detection with optional Gemini fallback
-- **Low Latency**: ~100-200ms gesture response (vs 2-3s with API-only)
+- **Low Latency**: ~100-200ms gesture response
 - **Voice Input**: Push-to-talk with real-time Whisper transcription
 - **Dual-Hand System**: Left hand clutch + right hand gestures
-- **Beautiful UI**: Modern card-based overlay with color-coded controls
+- **10 Configurable Gestures**: Customizable commands via settings panel
 - **Zero Accidental Triggers**: Clutch mechanism prevents unintended activation
-- **5 Core Gestures**: Voice, commit & push, clear input, start/stop server
-- **Highly Configurable**: YAML-based configuration for all settings
 
 ## Gesture Commands
 
 ### Left Hand: Clutch Control
-- **Closed Fist** → Clutch **ENGAGED** (enables right-hand gestures)
-- **Open/No gesture** → Clutch **DISENGAGED** (all gestures ignored)
+- **Closed Fist** - Clutch ENGAGED (enables right-hand gestures)
+- **Open/No gesture** - Clutch DISENGAGED (all gestures ignored)
 
 ### Right Hand: Commands (only active when clutch engaged)
 
-| Gesture | Action | Description |
-|---------|--------|-------------|
-| **Open Palm** | Voice Dictation | Push-to-talk: Hold to record, release to transcribe |
-| **Peace Sign** | Start Dev Server | Types "start the dev server" + Enter |
-| **Thumbs Up** | Commit & Push | Types "commit and push" + Enter |
-| **Thumbs Down** | Clear Input | Sends Escape + Escape to clear input |
-| **Pointing** | Stop Dev Server | Types "kill the running server" + Enter |
+| Gesture | Default Action | Description |
+|---------|----------------|-------------|
+| Open Palm | Voice Dictation | Push-to-talk: Hold to record, release to transcribe |
+| Peace Sign | Start Server | Types "start the dev server" + Enter |
+| Thumbs Up | Compact | Types "/compact" + Enter |
+| Thumbs Down | Clear Input | Sends Escape + Escape |
+| Pointing | Help | Types "/help" + Enter |
+| OK Sign | Run Tests | Types "run the tests" + Enter |
+| Rock Sign | Show Cost | Types "/cost" + Enter |
+| Shaka | Git Status | Types "git status" + Enter |
+| Three Fingers | Clear Chat | Types "/clear" + Enter |
+| Four Fingers | Build | Types "build the project" + Enter |
+
+All gesture commands are configurable via the in-app settings panel (press `S`).
 
 ## Installation
 
 ### Prerequisites
 - macOS (tested on macOS 10.15+)
 - Python 3.10+
+- Node.js 18+
+- Rust (install via `rustup`)
 - Webcam
-- Google Gemini API Key ([Get one free](https://aistudio.google.com/app/apikey))
+- Google Gemini API Key (optional, for fallback detection)
 
 ### Setup
 
@@ -47,54 +55,98 @@ A macOS utility that combines AI-powered gesture recognition and voice transcrip
    cd gesture-control-claude
    ```
 
-2. **Install dependencies**:
+2. **Install Python dependencies**:
    ```bash
    pip3 install -r requirements.txt
    ```
 
-3. **Configure Gemini API key**:
-   Create a `.env.local` file:
+3. **Install Tauri app dependencies**:
+   ```bash
+   cd tauri-app
+   npm install
+   cd ..
+   ```
+
+4. **Configure Gemini API key** (optional):
    ```bash
    echo "GEMINI_API_KEY=your_api_key_here" > .env.local
    ```
 
-4. **Grant camera permissions**:
-   - System Settings → Privacy & Security → Camera
-   - Allow Terminal/iTerm to access camera
-
-5. **Grant accessibility permissions** (for keyboard simulation):
-   - System Settings → Privacy & Security → Accessibility
-   - Add Terminal/iTerm to the list
+5. **Grant permissions**:
+   - System Settings > Privacy & Security > Camera (allow Terminal)
+   - System Settings > Privacy & Security > Accessibility (add Terminal)
 
 ## Usage
 
 ### Running the App
 
+**Terminal 1 - Start the Python backend**:
 ```bash
-python3 main.py
+python3 ws_server.py
 ```
 
-### Quick Start Guide
+**Terminal 2 - Start the Tauri app**:
+```bash
+cd tauri-app
+npm run tauri dev
+```
 
-1. **Launch** the application - webcam feed opens with overlay
-2. **Position hands** in front of the camera
-3. **Close left fist** to engage clutch (green border appears)
-4. **Make gestures** with your right hand:
-   - Hold **open palm** and speak, release when done
-   - Show **thumbs up** to commit and push
-   - Show **thumbs down** to clear input
-   - And more!
-5. **Press keys**:
-   - `h` - Toggle hints overlay
-   - `q` - Quit application
+### Keyboard Shortcuts
 
-### Voice Input Tips
+| Key | Action |
+|-----|--------|
+| `H` | Toggle gesture hints panel |
+| `S` | Open settings panel |
 
-- **Hold open palm** gesture while speaking
-- **Speak clearly** into your microphone
-- **Release gesture** when finished speaking
-- Text appears automatically in Claude Code input
-- Uses Whisper AI for accurate transcription
+### Quick Start
+
+1. Launch both the Python backend and Tauri app
+2. Position hands in front of the camera
+3. Close left fist to engage clutch (green border appears)
+4. Make gestures with your right hand
+5. Press `S` to customize gesture commands
+
+## Architecture
+
+```
++------------------------------------------+
+|          Tauri Frontend (React)          |
+|  - Modern UI with Tailwind + Framer      |
+|  - Glass morphism, animations            |
+|  - Real-time video display               |
+|  - Settings panel with gesture config    |
++--------------------+---------------------+
+                     | WebSocket (ws://localhost:8765)
+                     v
++------------------------------------------+
+|       Python WebSocket Server            |
+|  - Streams video frames (base64 JPEG)    |
+|  - MediaPipe hand tracking               |
+|  - Hybrid gesture detection              |
+|  - Whisper voice transcription           |
++------------------------------------------+
+```
+
+### Key Components
+
+- **ws_server.py**: WebSocket server streaming frames and gesture data
+- **HandTracker**: MediaPipe wrapper for hand landmark detection
+- **ClutchDetector**: Detects closed fist on left hand
+- **HybridGestureDetector**: Fast local detection with optional Gemini fallback
+- **CommandGestureRecognizer**: Geometric gesture detection with confidence scoring
+- **AudioHandler**: Real-time Whisper transcription
+- **Tauri Frontend**: React + Tailwind + Framer Motion UI
+
+### Technology Stack
+
+- **[Tauri](https://tauri.app/)** - Native desktop app framework
+- **[React](https://react.dev/)** - UI framework
+- **[Tailwind CSS](https://tailwindcss.com/)** - Styling
+- **[Framer Motion](https://www.framer.com/motion/)** - Animations
+- **[MediaPipe](https://mediapipe.dev/)** - Hand tracking
+- **[Google Gemini](https://ai.google.dev/)** - Optional gesture verification
+- **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** - Speech-to-text
+- **[OpenCV](https://opencv.org/)** - Computer vision
 
 ## Configuration
 
@@ -102,187 +154,92 @@ Edit `config.yaml` to customize settings:
 
 ```yaml
 clutch:
-  hand: left                    # Which hand for clutch
+  hand: left
   gesture: closed_fist
-  require_stable_frames: 5      # Stability threshold
+  require_stable_frames: 5
 
 gestures:
-  open_palm: voice_dictation
-  peace_sign: start_dev_server
-  thumbs_up: commit_push
-  thumbs_down: clear_input
-  pointing: stop_dev_server
+  open_palm:
+    action: voice_dictation
+    description: "Voice Input"
+  peace_sign:
+    command: "start the dev server"
+    description: "Start Server"
+  # ... more gestures
 
 settings:
-  confidence_threshold: 0.7     # Hand detection confidence
-  cooldown_ms: 500              # Delay between gestures
-  require_terminal_focus: false # Terminal focus requirement
+  confidence_threshold: 0.7
+  cooldown_ms: 500
   camera_resolution: [640, 480]
   camera_fps: 20
 
-# Hybrid detection: fast local + optional Gemini fallback
 hybrid_detection:
-  use_gemini_fallback: false    # Set true for Gemini verification
+  use_gemini_fallback: false
   gestures:
     open_palm:
-      stability_frames: 2       # Frames needed (2 = ~100ms)
-      skip_gemini_above: 0.75   # Confidence threshold
-    peace_sign:
-      stability_frames: 4
-      skip_gemini_above: 0.85
-    # ... other gestures
-
-gemini:
-  model: gemini-2.5-flash       # Gemini model (for fallback)
-  sample_interval: 0.5          # Seconds between API calls
-  resize_width: 256             # Image width sent to API
+      stability_frames: 2
+      skip_gemini_above: 0.75
 ```
 
-## Architecture
-
-```
-Webcam Feed
-    ↓
-MediaPipe Hand Tracking
-    ├─→ Left Hand → Clutch Detection
-    └─→ Right Hand → Hybrid Gesture Detector
-                         ├─→ Local Detection (fast, ~1ms)
-                         └─→ Gemini Fallback (optional)
-    ↓
-Action Handler
-    ├─→ Whisper AI (Voice Transcription)
-    └─→ PyAutoGUI (Keyboard Simulation)
-```
-
-### Key Components
-
-- **HandTracker**: MediaPipe wrapper for hand landmark detection
-- **ClutchDetector**: Detects closed fist on left hand
-- **HybridGestureDetector**: Fast local detection with optional Gemini fallback
-- **CommandGestureRecognizer**: Geometric landmark-based gesture detection with confidence scoring
-- **AudioHandler**: Real-time audio recording and Whisper transcription (with artifact filtering)
-- **ActionHandler**: Executes commands and manages voice input
-- **VisualFeedback**: Card-based UI overlay
-
-### Technology Stack
-
-- **[MediaPipe](https://mediapipe.dev/)** - Hand tracking and landmark detection
-- **[Google Gemini Vision API](https://ai.google.dev/)** - Optional gesture verification
-- **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** - Speech-to-text
-- **[OpenCV](https://opencv.org/)** - Computer vision
-- **[PyAutoGUI](https://pyautogui.readthedocs.io/)** - Keyboard automation
-
-## Safety Features
-
-1. **Clutch Mechanism**: Gestures only work when left fist is closed
-2. **Confidence Scoring**: Each gesture has a confidence threshold (0.0-1.0)
-3. **Frame Stability**: Requires consistent detection over multiple frames
-4. **Cooldown Period**: Prevents rapid double-triggers
-5. **Hand Loss Reset**: Resets state when hands leave frame
-6. **Strict Gesture Discrimination**: Gestures require clear, distinct hand positions
-
-## Troubleshooting
-
-### Gestures Not Triggering
-- Ensure clutch (left fist) is engaged (green border)
-- Make gestures clearly in front of camera
-- Check camera permissions granted
-- Verify `.env.local` has valid Gemini API key
-- Try adjusting `confidence_threshold` in config
-
-### Voice Input Not Working
-- Hold open palm gesture while speaking
-- Ensure microphone is working
-- Check for "Processing..." logs
-- Verify faster-whisper installed: `pip3 show faster-whisper`
-- Wait 3 seconds before releasing gesture (chunk processing)
-
-### Gemini API Issues
-- Check API key in `.env.local`
-- Verify API quota: [Google AI Studio](https://aistudio.google.com/)
-- Look for "Sending frame to Gemini API..." in logs
-- Check internet connection
-
-### Poor Gesture Detection
-- Improve lighting conditions
-- Make gestures clearly and deliberately
-- Try reducing `stability_frames` in hybrid_detection config
-- Ensure hand is fully visible in camera frame
-
-### Gestures Triggering Too Easily
-- Increase `stability_frames` for problematic gestures
-- Increase `skip_gemini_above` threshold (e.g., 0.90)
-- Make more deliberate, exaggerated gestures
-
-### High CPU Usage
-- Lower camera resolution in config
-- Reduce camera FPS
-- Close other applications
+Command presets are available in the settings panel for quick configuration.
 
 ## Project Structure
 
 ```
 gesture-control-claude/
-├── main.py                         # Entry point
+├── ws_server.py                    # WebSocket server (run this)
+├── main.py                         # Legacy OpenCV UI (deprecated)
 ├── config.yaml                     # Configuration
-├── requirements.txt                # Dependencies
+├── requirements.txt                # Python dependencies
 ├── .env.local                      # API keys (create this)
 ├── src/
 │   ├── hand_tracker.py             # MediaPipe hand tracking
 │   ├── clutch_detector.py          # Left hand clutch detection
 │   ├── hybrid_gesture_detector.py  # Fast local + Gemini fallback
-│   ├── gesture_recognizer.py       # Geometric gesture detection with confidence
-│   ├── gemini_gesture_detector.py  # Gemini Vision API integration
-│   ├── audio_handler.py            # Whisper transcription + artifact filtering
+│   ├── gesture_recognizer.py       # Geometric gesture detection
+│   ├── gemini_gesture_detector.py  # Gemini Vision API
+│   ├── audio_handler.py            # Whisper transcription
 │   ├── action_handler.py           # Command execution
+│   ├── config_manager.py           # Configuration management
 │   └── utils/
 │       ├── window_manager.py       # Window focus detection
-│       └── visual_feedback.py      # UI overlays
-└── README.md
+│       ├── visual_feedback.py      # Legacy UI overlays
+│       ├── settings_ui.py          # Legacy settings UI
+│       └── theme.py                # Color definitions
+└── tauri-app/                      # Native desktop app
+    ├── src/
+    │   ├── App.tsx                 # Main React component
+    │   ├── components/             # UI components
+    │   ├── hooks/                  # React hooks
+    │   ├── store/                  # Zustand state
+    │   └── types/                  # TypeScript types
+    └── src-tauri/                  # Rust backend
 ```
 
-## Future Enhancements
+## Troubleshooting
 
-- [ ] Custom gesture training via Gemini fine-tuning
-- [ ] Gesture chaining for complex commands
-- [ ] Right-hand clutch option for left-handed users
-- [ ] Background service mode (menu bar app)
-- [ ] Multi-language voice support
-- [ ] Gesture macros/shortcuts
-- [ ] Linux/Windows support
+### No Video in App
+- Ensure Python backend is running (`python3 ws_server.py`)
+- Check WebSocket connection in browser dev tools
+- Verify camera permissions
 
-## Development Notes
+### Gestures Not Triggering
+- Ensure clutch (left fist) is engaged (green border)
+- Make gestures clearly in front of camera
+- Check Python backend logs for detection output
 
-### Adding New Gestures
+### Voice Input Not Working
+- Hold open palm gesture while speaking
+- Ensure microphone is working
+- Check for transcription logs in Python backend
 
-1. Add detection method to `gesture_recognizer.py` (e.g., `detect_new_gesture()`)
-2. Add confidence method (e.g., `new_gesture_confidence()`)
-3. Add to `recognize_gesture()` and `recognize_with_confidence()`
-4. Add gesture config to `hybrid_gesture_detector.py` DEFAULT_GESTURE_CONFIG
-5. Add action method to `ActionHandler`
-6. Update `config.yaml` gesture mappings and hybrid_detection settings
-7. Update visual feedback hints in `visual_feedback.py`
-
-### Performance Optimization
-
-- Camera: 640x480 @ 20fps (balances accuracy and performance)
-- Local detection: ~1ms per frame (geometric landmark analysis)
-- Stability frames: 2-4 frames = 100-200ms response time
-- Whisper: int8 quantization for faster inference
-- MediaPipe: 0.7 confidence threshold (filters noise)
-
-## Credits
-
-Built with:
-- [Google Gemini Vision API](https://ai.google.dev/) - AI gesture detection
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - Speech-to-text
-- [MediaPipe](https://mediapipe.dev/) - Hand tracking
-- [OpenCV](https://opencv.org/) - Computer vision
-- [PyAutoGUI](https://pyautogui.readthedocs.io/) - Keyboard automation
+### Build Errors
+- Update Rust: `rustup update stable`
+- Clear npm cache: `cd tauri-app && rm -rf node_modules && npm install`
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT License
 
 ## Support
 
