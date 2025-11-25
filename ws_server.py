@@ -134,11 +134,11 @@ class GestureServer:
                 gestures[gesture] = config
         return {'gestures': gestures}
 
-    def update_gesture_command(self, gesture: str, command: str):
-        """Update a gesture's command."""
-        self.config_manager.set_gesture_command(gesture, command)
+    def update_gesture_command(self, gesture: str, command: str, description: str = None):
+        """Update a gesture's command and description."""
+        self.config_manager.set_gesture_command(gesture, command, description)
         self.config_manager.save_config()
-        logger.info(f"Updated gesture '{gesture}' command to: {command}")
+        logger.info(f"Updated gesture '{gesture}': command='{command}', description='{description}'")
 
     def cleanup(self):
         """Clean up resources."""
@@ -200,8 +200,9 @@ async def handle_client(websocket: WebSocketServerProtocol):
                     payload = data.get('payload', {})
                     gesture = payload.get('gesture')
                     command = payload.get('command')
+                    description = payload.get('description')
                     if gesture and command and server:
-                        server.update_gesture_command(gesture, command)
+                        server.update_gesture_command(gesture, command, description)
                         # Broadcast updated config
                         await broadcast({
                             'type': 'config',

@@ -13,9 +13,15 @@ function App() {
   const { updateGestureCommand } = useWebSocket();
   const { toggleSettings, toggleHints } = useAppStore();
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (ignore when typing in input fields)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input or textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
       if (e.key === 's' || e.key === 'S') {
         toggleSettings();
       } else if (e.key === 'h' || e.key === 'H') {

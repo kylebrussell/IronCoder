@@ -112,8 +112,8 @@ export function useWebSocket() {
     }
   }, []);
 
-  const updateGestureCommand = useCallback((gesture: string, command: string) => {
-    sendMessage('update_gesture', { gesture, command });
+  const updateGestureCommand = useCallback((gesture: string, command: string, description?: string) => {
+    sendMessage('update_gesture', { gesture, command, description });
   }, [sendMessage]);
 
   useEffect(() => {

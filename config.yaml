@@ -2,83 +2,80 @@ clutch:
   hand: left
   gesture: closed_fist
   require_stable_frames: 5
-
-# Gesture-to-command mappings
-# Each gesture can have either:
-#   - command: Text to type into Claude Code
-#   - action: Special action (voice_dictation, clear_input)
 gestures:
   open_palm:
     action: voice_dictation
-    description: "Voice Input"
+    description: Voice Input
   peace_sign:
-    command: "start the dev server"
-    description: "Start Server"
+    command: start the dev server
+    description: Start Server
   thumbs_up:
-    command: "commit and push"
-    description: "Commit & Push"
+    command: commit and push
+    description: Commit & Push
   thumbs_down:
     action: clear_input
-    description: "Clear Input"
+    description: Clear Input
   pointing:
-    command: "kill the running server"
-    description: "Stop Server"
+    command: kill the running server
+    description: Stop Server
   ok_sign:
-    command: "/help"
-    description: "Help"
+    command: /help
+    description: Help
   rock_sign:
-    command: "run tests"
-    description: "Run Tests"
+    command: run tests
+    description: Run Tests
   shaka:
-    command: "/clear"
-    description: "Clear Chat"
+    command: /clear
+    description: Clear Chat
   three_fingers:
-    command: "explain this code"
-    description: "Explain Code"
+    command: explain this code
+    description: Explain Code
   four_fingers:
-    command: "/cost"
-    description: "Show Cost"
-
-# Pre-defined command presets for quick selection in settings UI
+    command: /usage
+    description: Show Cost
 command_presets:
   claude_commands:
-    - "/help"
-    - "/clear"
-    - "/compact"
-    - "/cost"
-    - "/doctor"
-    - "/status"
+  - /help
+  - /clear
+  - /compact
+  - /cost
+  - /doctor
+  - /status
   dev_commands:
-    - "start the dev server"
-    - "kill the running server"
-    - "run tests"
-    - "run the build"
-    - "check for errors"
+  - start the dev server
+  - kill the running server
+  - run tests
+  - run the build
+  - check for errors
   git_commands:
-    - "commit and push"
-    - "show git status"
-    - "create a pull request"
-    - "undo the last commit"
+  - commit and push
+  - show git status
+  - create a pull request
+  - undo the last commit
   code_commands:
-    - "explain this code"
-    - "find bugs in this code"
-    - "refactor this function"
-    - "add comments to this code"
-
+  - explain this code
+  - find bugs in this code
+  - refactor this function
+  - add comments to this code
 settings:
   confidence_threshold: 0.7
   cooldown_ms: 500
   require_terminal_focus: false
-  camera_resolution: [640, 480]
+  camera_resolution:
+  - 640
+  - 480
   camera_fps: 20
-
 visual_feedback:
   show_overlay: true
   show_hints: true
-  clutch_engaged_color: [140, 210, 140]
-  clutch_disengaged_color: [120, 110, 130]
-
-# Hybrid gesture detection settings
+  clutch_engaged_color:
+  - 140
+  - 210
+  - 140
+  clutch_disengaged_color:
+  - 120
+  - 110
+  - 130
 hybrid_detection:
   use_gemini_fallback: false
   gestures:
@@ -111,9 +108,7 @@ hybrid_detection:
       skip_gemini_above: 0.85
     four_fingers:
       stability_frames: 4
-      skip_gemini_above: 0.80
-
-# Gemini Vision API settings (used for fallback verification only)
+      skip_gemini_above: 0.8
 gemini:
   model: gemini-2.5-flash
   sample_interval: 0.5

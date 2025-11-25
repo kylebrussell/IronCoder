@@ -24,35 +24,45 @@ const PRESET_COMMANDS = {
 };
 
 interface SettingsPanelProps {
-  onUpdateCommand: (gesture: string, command: string) => void;
+  onUpdateCommand: (gesture: string, command: string, description?: string) => void;
 }
 
 export function SettingsPanel({ onUpdateCommand }: SettingsPanelProps) {
   const { showSettings, toggleSettings, gestureConfig, updateGestureCommand } = useAppStore();
   const [selectedGesture, setSelectedGesture] = useState<GestureName | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editCommand, setEditCommand] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const [activePreset, setActivePreset] = useState<keyof typeof PRESET_COMMANDS>('claude');
 
   const handleEdit = (gesture: GestureName) => {
     const config = gestureConfig[gesture];
     if (config?.action) return; // Can't edit special actions
     setSelectedGesture(gesture);
-    setEditValue(config?.command || '');
+    setEditCommand(config?.command || '');
+    // Only pre-fill description if it's different from the command
+    const desc = config?.description || '';
+    setEditDescription(desc !== config?.command ? desc : '');
   };
 
   const handleSave = () => {
-    if (selectedGesture && editValue.trim()) {
-      updateGestureCommand(selectedGesture, editValue.trim());
-      onUpdateCommand(selectedGesture, editValue.trim());
+    if (selectedGesture && editCommand.trim()) {
+      const description = editDescription.trim() || editCommand.trim();
+      updateGestureCommand(selectedGesture, editCommand.trim(), description);
+      onUpdateCommand(selectedGesture, editCommand.trim(), description);
     }
     setSelectedGesture(null);
-    setEditValue('');
+    setEditCommand('');
+    setEditDescription('');
+  };
+
+  const handleCancel = () => {
+    setSelectedGesture(null);
+    setEditCommand('');
+    setEditDescription('');
   };
 
   const handlePresetSelect = (command: string) => {
-    if (selectedGesture) {
-      setEditValue(command);
-    }
+    setEditCommand(command);
   };
 
   return (
@@ -129,9 +139,16 @@ export function SettingsPanel({ onUpdateCommand }: SettingsPanelProps) {
                                 [{config.action}]
                               </span>
                             ) : (
-                              <span className="text-sm text-accent-cyan truncate max-w-[200px]">
-                                {config?.command || 'Not set'}
-                              </span>
+                              <div className="text-right">
+                                <span className="text-sm text-accent-cyan truncate max-w-[200px] block">
+                                  {config?.description || config?.command || 'Not set'}
+                                </span>
+                                {config?.description && config.description !== config.command && (
+                                  <span className="text-xs text-text-muted truncate max-w-[200px] block">
+                                    {config.command}
+                                  </span>
+                                )}
+                              </div>
                             )}
 
                             {!isSpecial && (
@@ -154,18 +171,40 @@ export function SettingsPanel({ onUpdateCommand }: SettingsPanelProps) {
                               className="overflow-hidden"
                             >
                               <div className="p-3 pt-0 space-y-3">
-                                <input
-                                  type="text"
-                                  value={editValue}
-                                  onChange={(e) => setEditValue(e.target.value)}
-                                  placeholder="Enter command..."
-                                  className="w-full px-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-blue/50"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSave();
-                                    if (e.key === 'Escape') setSelectedGesture(null);
-                                  }}
-                                />
+                                {/* Command input */}
+                                <div>
+                                  <label className="block text-xs text-text-muted mb-1">Command</label>
+                                  <input
+                                    type="text"
+                                    value={editCommand}
+                                    onChange={(e) => setEditCommand(e.target.value)}
+                                    placeholder="Enter command to execute..."
+                                    className="w-full px-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-blue/50"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) handleSave();
+                                      if (e.key === 'Escape') handleCancel();
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Description input */}
+                                <div>
+                                  <label className="block text-xs text-text-muted mb-1">
+                                    Label <span className="text-text-muted/50">(shown in hints, optional)</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    placeholder="e.g. Start Server, Run Tests..."
+                                    className="w-full px-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-blue/50"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) handleSave();
+                                      if (e.key === 'Escape') handleCancel();
+                                    }}
+                                  />
+                                </div>
 
                                 {/* Presets */}
                                 <div>
@@ -202,7 +241,7 @@ export function SettingsPanel({ onUpdateCommand }: SettingsPanelProps) {
                                 {/* Actions */}
                                 <div className="flex justify-end gap-2">
                                   <button
-                                    onClick={() => setSelectedGesture(null)}
+                                    onClick={handleCancel}
                                     className="px-4 py-2 rounded-lg text-sm text-text-muted hover:bg-bg-elevated transition-colors"
                                   >
                                     Cancel

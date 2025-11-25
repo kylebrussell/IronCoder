@@ -30,7 +30,7 @@ interface AppState {
   // Gesture configuration
   gestureConfig: Record<string, GestureConfig>;
   setGestureConfig: (config: Record<string, GestureConfig>) => void;
-  updateGestureCommand: (gesture: string, command: string) => void;
+  updateGestureCommand: (gesture: string, command: string, description?: string) => void;
 
   // UI state
   showSettings: boolean;
@@ -97,13 +97,15 @@ export const useAppStore = create<AppState>((set) => ({
   // Gesture configuration
   gestureConfig: defaultGestureConfig,
   setGestureConfig: (config) => set({ gestureConfig: config }),
-  updateGestureCommand: (gesture, command) =>
+  updateGestureCommand: (gesture, command, description) =>
     set((state) => ({
       gestureConfig: {
         ...state.gestureConfig,
         [gesture]: {
           ...state.gestureConfig[gesture],
           command,
+          // Use provided description, or fall back to command if no description set
+          description: description || state.gestureConfig[gesture]?.description || command,
         },
       },
     })),
