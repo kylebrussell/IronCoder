@@ -54,6 +54,26 @@ class HybridGestureDetector:
             'stability_frames': 3,
             'skip_gemini_above': 0.80,
         },
+        'ok_sign': {
+            'stability_frames': 3,
+            'skip_gemini_above': 0.80,
+        },
+        'rock_sign': {
+            'stability_frames': 3,
+            'skip_gemini_above': 0.80,
+        },
+        'shaka': {
+            'stability_frames': 3,
+            'skip_gemini_above': 0.80,
+        },
+        'three_fingers': {
+            'stability_frames': 3,
+            'skip_gemini_above': 0.80,
+        },
+        'four_fingers': {
+            'stability_frames': 3,
+            'skip_gemini_above': 0.75,  # Lower threshold - similar to open palm
+        },
     }
 
     def __init__(

@@ -1,19 +1,30 @@
 """
 Action handler for executing commands based on detected gestures.
+Supports configurable gesture-to-command mappings via ConfigManager.
 """
 import pyautogui
 import logging
 import time
 from typing import Optional
 from src.audio_handler import AudioHandler
+from src.config_manager import ConfigManager
 
 
 class ActionHandler:
     """Handles execution of actions triggered by gestures."""
 
-    def __init__(self):
-        """Initialize action handler."""
+    def __init__(self, config_manager: Optional[ConfigManager] = None):
+        """
+        Initialize action handler.
+
+        Args:
+            config_manager: Optional ConfigManager for gesture-command mappings.
+                          If not provided, creates a default one.
+        """
         self.logger = logging.getLogger(__name__)
+
+        # Use provided config manager or create default
+        self.config = config_manager or ConfigManager()
 
         # Set PyAutoGUI settings for safety
         pyautogui.PAUSE = 0.1  # Pause between actions
@@ -103,85 +114,33 @@ class ActionHandler:
             except Exception as e:
                 self.logger.error(f"Failed to type transcription: {e}")
 
-    def send_yes_enter(self) -> bool:
+    def execute_command(self, command: str) -> bool:
         """
-        Type 'Yes, proceed to the next steps' and press Enter.
+        Type a command string and press Enter.
+
+        Args:
+            command: The command text to type
 
         Returns:
             True if successful
         """
         try:
-            self.logger.info("Action: Sending 'Yes, proceed to the next steps'")
-            pyautogui.write('Yes, proceed to the next steps', interval=0.05)
+            self.logger.info(f"Action: Executing command '{command}'")
+            pyautogui.write(command, interval=0.05)
             time.sleep(0.1)
             pyautogui.press('enter')
             return True
         except Exception as e:
-            self.logger.error(f"Failed to send yes+enter: {e}")
-            return False
-
-    def git_commit_push(self) -> bool:
-        """
-        Type 'commit and push' command and press Enter.
-
-        This tells Claude Code to commit changes and push them.
-
-        Returns:
-            True if successful
-        """
-        try:
-            self.logger.info("Action: Sending 'commit and push' command")
-            pyautogui.write('commit and push', interval=0.05)
-            time.sleep(0.1)
-            pyautogui.press('enter')
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to send git commit+push: {e}")
-            return False
-
-    def start_dev_server(self) -> bool:
-        """
-        Type 'start the dev server' command and press Enter.
-
-        This tells Claude Code to start the development server for the current project.
-
-        Returns:
-            True if successful
-        """
-        try:
-            self.logger.info("Action: Sending 'start the dev server' command")
-            pyautogui.write('start the dev server', interval=0.05)
-            time.sleep(0.1)
-            pyautogui.press('enter')
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to send start dev server: {e}")
-            return False
-
-    def stop_dev_server(self) -> bool:
-        """
-        Type 'kill the running server' command and press Enter.
-
-        This tells Claude Code to stop the currently running development server.
-
-        Returns:
-            True if successful
-        """
-        try:
-            self.logger.info("Action: Sending 'kill the running server' command")
-            pyautogui.write('kill the running server', interval=0.05)
-            time.sleep(0.1)
-            pyautogui.press('enter')
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to send stop dev server: {e}")
+            self.logger.error(f"Failed to execute command: {e}")
             return False
 
     def execute_gesture_action(self, gesture: str) -> Optional[str]:
         """
         Execute the appropriate action for a detected gesture.
 
-        Note: open_palm is handled separately in main loop for push-to-talk behavior.
+        Uses ConfigManager to look up the command/action for the gesture.
+        Note: open_palm (voice_dictation) is handled separately in main loop
+        for push-to-talk behavior.
 
         Args:
             gesture: Gesture name from CommandGestureRecognizer
@@ -189,23 +148,49 @@ class ActionHandler:
         Returns:
             Human-readable description of the action taken, or None if no action
         """
-        action_map = {
-            'peace_sign': (self.start_dev_server, "Start Dev Server"),
-            'thumbs_up': (self.git_commit_push, "Commit & Push"),
-            'thumbs_down': (self.send_escape_escape, "Input Cleared"),
-            'pointing': (self.stop_dev_server, "Stop Dev Server")
-        }
+        # Get gesture configuration
+        gesture_config = self.config.get_gesture_config(gesture)
 
-        if gesture in action_map:
-            action_func, action_name = action_map[gesture]
-            success = action_func()
+        if not gesture_config:
+            self.logger.warning(f"No configuration found for gesture: {gesture}")
+            return None
 
-            if success:
-                return action_name
+        # Get description for feedback
+        description = self.config.get_gesture_description(gesture)
+
+        # Check for special action
+        action = gesture_config.get('action')
+        if action:
+            if action == 'voice_dictation':
+                # Handled separately in main loop
+                return None
+            elif action == 'clear_input':
+                success = self.send_escape_escape()
+                return description if success else f"{description} (FAILED)"
             else:
-                return f"{action_name} (FAILED)"
+                self.logger.warning(f"Unknown action: {action}")
+                return None
+
+        # Execute text command
+        command = gesture_config.get('command')
+        if command:
+            success = self.execute_command(command)
+            return description if success else f"{description} (FAILED)"
 
         return None
+
+    def is_voice_gesture(self, gesture: str) -> bool:
+        """
+        Check if a gesture is configured for voice dictation.
+
+        Args:
+            gesture: Gesture name
+
+        Returns:
+            True if gesture uses voice_dictation action
+        """
+        action = self.config.get_gesture_action(gesture)
+        return action == 'voice_dictation'
 
     def is_dictation_active(self) -> bool:
         """

@@ -5,7 +5,6 @@ Main entry point for the gesture control system.
 Uses hybrid gesture detection: fast local detection with optional Gemini fallback.
 """
 import cv2
-import yaml
 import logging
 from dotenv import load_dotenv
 from src.hand_tracker import HandTracker
@@ -13,21 +12,13 @@ from src.clutch_detector import ClutchDetector
 from src.hybrid_gesture_detector import HybridGestureDetector
 from src.gemini_gesture_detector import GeminiGestureDetector
 from src.action_handler import ActionHandler
+from src.config_manager import ConfigManager
 from src.utils.window_manager import WindowManager
 from src.utils.visual_feedback import VisualFeedback
+from src.utils.settings_ui import SettingsUI
 
 # Load environment variables from .env.local
 load_dotenv('.env.local')
-
-
-def load_config(config_path: str = "config.yaml") -> dict:
-    """Load configuration from YAML file."""
-    try:
-        with open(config_path, 'r') as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        logging.warning(f"Config file {config_path} not found. Using defaults.")
-        return {}
 
 
 def main():
@@ -40,8 +31,9 @@ def main():
 
     logger = logging.getLogger(__name__)
 
-    # Load configuration
-    config = load_config()
+    # Load configuration using ConfigManager
+    config_manager = ConfigManager()
+    config = config_manager.config
 
     # Extract settings
     camera_width = config.get('settings', {}).get('camera_resolution', [640, 480])[0]
@@ -49,23 +41,18 @@ def main():
     camera_fps = config.get('settings', {}).get('camera_fps', 20)
     confidence_threshold = config.get('settings', {}).get('confidence_threshold', 0.7)
     cooldown_ms = config.get('settings', {}).get('cooldown_ms', 500)
-    require_terminal_focus = config.get('settings', {}).get('require_terminal_focus', True)
+    require_terminal_focus = config.get('settings', {}).get('require_terminal_focus', False)
     require_stable_frames = config.get('clutch', {}).get('require_stable_frames', 5)
     show_overlay = config.get('visual_feedback', {}).get('show_overlay', True)
 
     # Gemini settings (for fallback)
-    gemini_model = config.get('gemini', {}).get('model', 'gemini-2.0-flash-exp')
+    gemini_model = config.get('gemini', {}).get('model', 'gemini-2.5-flash')
     gemini_sample_interval = config.get('gemini', {}).get('sample_interval', 0.5)
-    gemini_stability_frames = config.get('gemini', {}).get('stability_frames', 2)
-    gemini_resize_width = config.get('gemini', {}).get('resize_width', 512)
+    gemini_resize_width = config.get('gemini', {}).get('resize_width', 256)
 
     # Hybrid detection settings
-    use_gemini_fallback = config.get('hybrid_detection', {}).get('use_gemini_fallback', True)
+    use_gemini_fallback = config.get('hybrid_detection', {}).get('use_gemini_fallback', False)
     gesture_config = config.get('hybrid_detection', {}).get('gestures', {})
-
-    # Get visual feedback colors
-    clutch_engaged_color = tuple(config.get('visual_feedback', {}).get('clutch_indicator_color', [0, 255, 0]))
-    clutch_disengaged_color = tuple(config.get('visual_feedback', {}).get('clutch_disengaged_color', [255, 0, 0]))
 
     logger.info("=== IronCoder Gesture Control for Claude Code ===")
     logger.info(f"Camera: {camera_width}x{camera_height} @ {camera_fps}fps")
@@ -91,7 +78,7 @@ def main():
                 sample_interval=gemini_sample_interval,
                 stability_frames=1,  # Single verification, no stability needed
                 cooldown_ms=cooldown_ms,
-                resize_width=256  # Smaller for fallback speed
+                resize_width=gemini_resize_width
             )
             logger.info(f"Gemini fallback initialized (model: {gemini_model})")
         except ValueError as e:
@@ -107,12 +94,15 @@ def main():
     )
     logger.info("Hybrid gesture detector initialized (fast local + optional Gemini fallback)")
 
-    action_handler = ActionHandler()
+    # Initialize action handler with config manager
+    action_handler = ActionHandler(config_manager=config_manager)
     window_manager = WindowManager()
-    visual_feedback = VisualFeedback(
-        clutch_engaged_color=clutch_engaged_color,
-        clutch_disengaged_color=clutch_disengaged_color
-    )
+
+    # Initialize visual feedback with config manager
+    visual_feedback = VisualFeedback(config_manager=config_manager)
+
+    # Initialize settings UI
+    settings_ui = SettingsUI(config_manager)
 
     # Initialize webcam
     cap = cv2.VideoCapture(0)
@@ -124,13 +114,11 @@ def main():
         logger.error("Failed to open webcam")
         return
 
-    logger.info("System initialized. Press 'q' to quit, 'h' to toggle hints.")
+    logger.info("System initialized. Press 'q' to quit, 'h' to toggle hints, 's' for settings.")
     logger.info("LEFT HAND: Close fist to ENGAGE clutch")
     logger.info("RIGHT HAND: Make gestures when clutch is ENGAGED")
 
     show_hints = True
-    action_feedback_text = None
-    action_feedback_timer = 0
     previous_gesture = None  # Track previous gesture for push-to-talk
 
     try:
@@ -153,11 +141,14 @@ def main():
             # Update clutch detector with left hand
             clutch_engaged = clutch_detector.update(left_hand)
 
-            # Only process gestures if clutch is engaged
+            # Only process gestures if clutch is engaged and settings UI is not visible
             triggered_gesture = None
             current_gesture = None
             detection_source = None
-            if clutch_engaged:
+            action_text = None
+            action_gesture = None
+
+            if clutch_engaged and not settings_ui.is_visible:
                 # Check if terminal is focused (if required)
                 terminal_focused = not require_terminal_focus or window_manager.is_terminal_active()
 
@@ -173,34 +164,31 @@ def main():
                     # Get current gesture state (not just newly triggered)
                     current_gesture = gesture_detector.get_current_gesture()
 
-                    # Handle push-to-talk for open_palm gesture
-                    if current_gesture == 'open_palm' and previous_gesture != 'open_palm':
-                        # Open palm just started - begin recording
+                    # Handle push-to-talk for voice gestures
+                    if action_handler.is_voice_gesture(current_gesture) and not action_handler.is_voice_gesture(previous_gesture):
+                        # Voice gesture just started - begin recording
                         if action_handler.start_recording():
-                            action_feedback_text = "Recording..."
-                            action_feedback_timer = 9999  # Keep showing while recording
-                    elif previous_gesture == 'open_palm' and current_gesture != 'open_palm':
-                        # Open palm just ended - stop recording
+                            action_text = "Recording..."
+                            action_gesture = current_gesture
+                    elif action_handler.is_voice_gesture(previous_gesture) and not action_handler.is_voice_gesture(current_gesture):
+                        # Voice gesture just ended - stop recording
                         action_handler.stop_recording()
-                        action_feedback_text = None
-                        action_feedback_timer = 0
 
                     # Execute action if non-voice gesture was triggered
-                    if triggered_gesture and triggered_gesture not in ['open_palm', 'none']:
-                        action_text = action_handler.execute_gesture_action(triggered_gesture)
-                        if action_text:
+                    if triggered_gesture and not action_handler.is_voice_gesture(triggered_gesture) and triggered_gesture != 'none':
+                        result_text = action_handler.execute_gesture_action(triggered_gesture)
+                        if result_text:
                             # Show source (local/gemini) in feedback
                             source_indicator = "fast" if detection_source == 'local' else "verified"
-                            action_feedback_text = f"{action_text} ({source_indicator})"
-                            action_feedback_timer = 60  # Show for 60 frames (~2 seconds at 30fps)
+                            action_text = f"{result_text} ({source_indicator})"
+                            action_gesture = triggered_gesture
             else:
                 # Reset gesture detector when clutch is disengaged
-                gesture_detector.reset()
-                # Stop recording if clutch is disengaged
+                if not clutch_engaged:
+                    gesture_detector.reset()
+                # Stop recording if clutch is disengaged or settings visible
                 if action_handler.is_dictation_active():
                     action_handler.stop_recording()
-                    action_feedback_text = None
-                    action_feedback_timer = 0
 
             # Update previous gesture for next iteration
             previous_gesture = current_gesture
@@ -214,48 +202,44 @@ def main():
 
             # Visual feedback
             if show_overlay:
-                # Draw clutch border indicator
-                visual_feedback.draw_clutch_indicator(processed_frame, clutch_engaged)
-
-                # Draw status text
+                # Get current gesture state
                 status = gesture_detector.get_status()
                 status_gesture = status.get('current_gesture')
-                visual_feedback.draw_status_text(
+
+                # Draw all visual feedback
+                processed_frame = visual_feedback.draw_all(
                     processed_frame,
-                    clutch_engaged,
-                    status_gesture
+                    clutch_engaged=clutch_engaged,
+                    current_gesture=status_gesture,
+                    is_dictating=action_handler.is_dictation_active(),
+                    show_hints=show_hints and not settings_ui.is_visible,
+                    action_text=action_text,
+                    action_gesture=action_gesture
                 )
 
-                # Draw gesture hints
-                visual_feedback.draw_gesture_hint(processed_frame, show_hints)
-
-                # Draw action feedback
-                if action_feedback_timer > 0:
-                    visual_feedback.draw_action_feedback(
-                        processed_frame,
-                        action_feedback_text
-                    )
-                    action_feedback_timer -= 1
-                else:
-                    action_feedback_text = None
-
-                # Draw dictation indicator
-                visual_feedback.draw_dictation_indicator(
-                    processed_frame,
-                    action_handler.is_dictation_active()
-                )
+            # Draw settings UI if visible
+            processed_frame = settings_ui.draw(processed_frame)
 
             # Display the frame
             cv2.imshow('IronCoder Gesture Control', processed_frame)
 
             # Handle keyboard input
             key = cv2.waitKey(1) & 0xFF
+
+            # Route keyboard input through settings UI first
+            if settings_ui.handle_key(key):
+                continue
+
+            # Main app key handling
             if key == ord('q'):
                 logger.info("Quit signal received")
                 break
             elif key == ord('h'):
                 show_hints = not show_hints
                 logger.info(f"Hints {'enabled' if show_hints else 'disabled'}")
+            elif key == ord('s'):
+                settings_ui.toggle_visibility()
+                logger.info(f"Settings {'opened' if settings_ui.is_visible else 'closed'}")
 
     except KeyboardInterrupt:
         logger.info("Interrupted by user")

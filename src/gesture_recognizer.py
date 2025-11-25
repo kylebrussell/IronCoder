@@ -20,6 +20,11 @@ class CommandGestureRecognizer:
     GESTURE_THUMBS_UP = "thumbs_up"
     GESTURE_THUMBS_DOWN = "thumbs_down"
     GESTURE_POINTING = "pointing"
+    GESTURE_OK_SIGN = "ok_sign"
+    GESTURE_ROCK_SIGN = "rock_sign"
+    GESTURE_SHAKA = "shaka"
+    GESTURE_THREE_FINGERS = "three_fingers"
+    GESTURE_FOUR_FINGERS = "four_fingers"
 
     def __init__(
         self,
@@ -294,11 +299,198 @@ class CommandGestureRecognizer:
         return (index_extended and middle_curled and ring_curled and
                 pinky_curled and thumb_not_up and index_clearly_up)
 
+    def detect_ok_sign(self, hand_data: Optional[Dict]) -> bool:
+        """
+        Detect OK sign gesture (thumb and index form circle, other fingers extended).
+
+        Args:
+            hand_data: Hand data from HandTracker
+
+        Returns:
+            True if OK sign is detected
+        """
+        if hand_data is None:
+            return False
+
+        landmarks = hand_data['landmarks']
+
+        # Thumb tip (4) and Index tip (8) should be close together
+        thumb_tip = landmarks[4]
+        index_tip = landmarks[8]
+
+        # Calculate distance between tips
+        tip_distance = math.sqrt(
+            (thumb_tip['x'] - index_tip['x'])**2 +
+            (thumb_tip['y'] - index_tip['y'])**2
+        )
+
+        # Tips should be close (forming circle) - within 6% of frame
+        circle_formed = tip_distance < 0.06
+
+        # Middle, ring, pinky should be extended (not curled)
+        middle_extended = self.is_finger_extended(landmarks, 12, 10)
+        ring_extended = self.is_finger_extended(landmarks, 16, 14)
+        pinky_extended = self.is_finger_extended(landmarks, 20, 18)
+
+        return circle_formed and middle_extended and ring_extended and pinky_extended
+
+    def detect_rock_sign(self, hand_data: Optional[Dict]) -> bool:
+        """
+        Detect rock sign gesture (index and pinky extended, middle and ring curled).
+
+        Args:
+            hand_data: Hand data from HandTracker
+
+        Returns:
+            True if rock sign is detected
+        """
+        if hand_data is None:
+            return False
+
+        landmarks = hand_data['landmarks']
+
+        # Index (8) and Pinky (20) should be extended
+        index_extended = self.is_finger_extended(landmarks, 8, 6, 5)
+        pinky_extended = self.is_finger_extended(landmarks, 20, 18, 17)
+
+        # Middle (12) and Ring (16) should be curled
+        middle_tip = landmarks[12]
+        middle_pip = landmarks[10]
+        ring_tip = landmarks[16]
+        ring_pip = landmarks[14]
+
+        middle_curled = middle_tip['y'] > middle_pip['y']
+        ring_curled = ring_tip['y'] > ring_pip['y']
+
+        # Thumb should be tucked (not extended outward significantly)
+        thumb_tip = landmarks[4]
+        thumb_mcp = landmarks[2]
+        wrist = landmarks[0]
+        thumb_tucked = abs(thumb_tip['x'] - wrist['x']) < abs(thumb_mcp['x'] - wrist['x']) + 0.06
+
+        # Require spread between index and pinky tips
+        index_tip = landmarks[8]
+        pinky_tip = landmarks[20]
+        has_spread = abs(index_tip['x'] - pinky_tip['x']) > 0.07
+
+        return (index_extended and pinky_extended and
+                middle_curled and ring_curled and thumb_tucked and has_spread)
+
+    def detect_shaka(self, hand_data: Optional[Dict]) -> bool:
+        """
+        Detect shaka/hang loose gesture (thumb and pinky extended horizontally).
+
+        Args:
+            hand_data: Hand data from HandTracker
+
+        Returns:
+            True if shaka is detected
+        """
+        if hand_data is None:
+            return False
+
+        landmarks = hand_data['landmarks']
+
+        # Thumb should be extended outward (horizontally, not vertically)
+        thumb_tip = landmarks[4]
+        thumb_mcp = landmarks[2]
+        wrist = landmarks[0]
+
+        # Thumb extended horizontally
+        thumb_horizontal_ext = abs(thumb_tip['x'] - wrist['x']) > abs(thumb_mcp['x'] - wrist['x']) + 0.04
+        # Thumb should not be pointing strongly up or down
+        thumb_not_vertical = abs(thumb_tip['y'] - thumb_mcp['y']) < 0.12
+
+        # Pinky should be extended
+        pinky_extended = self.is_finger_extended(landmarks, 20, 18, 17)
+
+        # Index, middle, ring should be curled
+        index_tip = landmarks[8]
+        index_pip = landmarks[6]
+        middle_tip = landmarks[12]
+        middle_pip = landmarks[10]
+        ring_tip = landmarks[16]
+        ring_pip = landmarks[14]
+
+        index_curled = index_tip['y'] > index_pip['y']
+        middle_curled = middle_tip['y'] > middle_pip['y']
+        ring_curled = ring_tip['y'] > ring_pip['y']
+
+        return (thumb_horizontal_ext and thumb_not_vertical and
+                pinky_extended and index_curled and middle_curled and ring_curled)
+
+    def detect_three_fingers(self, hand_data: Optional[Dict]) -> bool:
+        """
+        Detect three fingers up gesture (index, middle, ring extended).
+
+        Args:
+            hand_data: Hand data from HandTracker
+
+        Returns:
+            True if three fingers is detected
+        """
+        if hand_data is None:
+            return False
+
+        landmarks = hand_data['landmarks']
+
+        # Index, middle, ring should be extended
+        index_extended = self.is_finger_extended(landmarks, 8, 6, 5)
+        middle_extended = self.is_finger_extended(landmarks, 12, 10, 9)
+        ring_extended = self.is_finger_extended(landmarks, 16, 14, 13)
+
+        # Pinky should be curled
+        pinky_tip = landmarks[20]
+        pinky_pip = landmarks[18]
+        pinky_curled = pinky_tip['y'] > pinky_pip['y']
+
+        # Thumb should be tucked or neutral (not extended up)
+        thumb_tip = landmarks[4]
+        thumb_ip = landmarks[3]
+        thumb_neutral = thumb_tip['y'] >= thumb_ip['y'] - 0.02
+
+        return (index_extended and middle_extended and ring_extended and
+                pinky_curled and thumb_neutral)
+
+    def detect_four_fingers(self, hand_data: Optional[Dict]) -> bool:
+        """
+        Detect four fingers up gesture (all fingers except thumb extended).
+        Distinguished from open palm by thumb being tucked.
+
+        Args:
+            hand_data: Hand data from HandTracker
+
+        Returns:
+            True if four fingers is detected
+        """
+        if hand_data is None:
+            return False
+
+        landmarks = hand_data['landmarks']
+
+        # All four fingers should be extended
+        index_extended = self.is_finger_extended(landmarks, 8, 6, 5)
+        middle_extended = self.is_finger_extended(landmarks, 12, 10, 9)
+        ring_extended = self.is_finger_extended(landmarks, 16, 14, 13)
+        pinky_extended = self.is_finger_extended(landmarks, 20, 18, 17)
+
+        # Thumb should be tucked (not extended outward like in open palm)
+        thumb_tip = landmarks[4]
+        thumb_mcp = landmarks[2]
+        wrist = landmarks[0]
+        # Thumb tip should NOT be significantly farther from wrist than MCP
+        thumb_tucked = abs(thumb_tip['x'] - wrist['x']) <= abs(thumb_mcp['x'] - wrist['x']) + 0.03
+
+        return (index_extended and middle_extended and ring_extended and
+                pinky_extended and thumb_tucked)
+
     def recognize_gesture(self, hand_data: Optional[Dict]) -> str:
         """
         Recognize gesture from hand data.
 
-        Priority order: pointing > peace_sign > thumbs_up > thumbs_down > open_palm
+        Priority order (most specific first):
+        ok_sign > rock_sign > shaka > pointing > peace_sign >
+        three_fingers > four_fingers > thumbs_up > thumbs_down > open_palm
 
         Args:
             hand_data: Hand data from HandTracker
@@ -311,18 +503,44 @@ class CommandGestureRecognizer:
 
         # Check gestures in priority order
         # (more specific gestures first to avoid false positives)
+
+        # OK sign - very specific (thumb+index circle)
+        if self.detect_ok_sign(hand_data):
+            return self.GESTURE_OK_SIGN
+
+        # Rock sign - index+pinky only
+        if self.detect_rock_sign(hand_data):
+            return self.GESTURE_ROCK_SIGN
+
+        # Shaka - thumb+pinky horizontal
+        if self.detect_shaka(hand_data):
+            return self.GESTURE_SHAKA
+
+        # Pointing - single finger
         if self.detect_pointing(hand_data):
             return self.GESTURE_POINTING
 
+        # Peace sign - two fingers
         if self.detect_peace_sign(hand_data):
             return self.GESTURE_PEACE_SIGN
 
+        # Three fingers
+        if self.detect_three_fingers(hand_data):
+            return self.GESTURE_THREE_FINGERS
+
+        # Four fingers (before open palm - distinguished by thumb)
+        if self.detect_four_fingers(hand_data):
+            return self.GESTURE_FOUR_FINGERS
+
+        # Thumbs up
         if self.detect_thumbs_up(hand_data):
             return self.GESTURE_THUMBS_UP
 
+        # Thumbs down
         if self.detect_thumbs_down(hand_data):
             return self.GESTURE_THUMBS_DOWN
 
+        # Open palm - most general (all 5 extended)
         if self.detect_open_palm(hand_data):
             return self.GESTURE_OPEN_PALM
 
@@ -754,6 +972,324 @@ class CommandGestureRecognizer:
 
         return min(confidence, 1.0)
 
+    def ok_sign_confidence(self, hand_data: Optional[Dict]) -> float:
+        """
+        Calculate confidence score for OK sign gesture (0.0-1.0).
+
+        Scoring:
+        - Base 0.50: Thumb and index tips close, other fingers extended
+        - +0.20: Tips very close (tight circle)
+        - +0.15: Other fingers clearly extended
+        """
+        if hand_data is None:
+            return 0.0
+
+        landmarks = hand_data['landmarks']
+        confidence = 0.0
+
+        # Check circle formed
+        thumb_tip = landmarks[4]
+        index_tip = landmarks[8]
+        tip_distance = math.sqrt(
+            (thumb_tip['x'] - index_tip['x'])**2 +
+            (thumb_tip['y'] - index_tip['y'])**2
+        )
+        circle_formed = tip_distance < 0.06
+
+        # Check other fingers extended
+        middle_ext = self.is_finger_extended(landmarks, 12, 10)
+        ring_ext = self.is_finger_extended(landmarks, 16, 14)
+        pinky_ext = self.is_finger_extended(landmarks, 20, 18)
+
+        # Base score
+        if circle_formed and middle_ext and ring_ext and pinky_ext:
+            confidence = 0.50
+        else:
+            return 0.0
+
+        # Bonus: very tight circle
+        if tip_distance < 0.03:
+            confidence += 0.20
+        elif tip_distance < 0.045:
+            confidence += 0.10
+
+        # Bonus: other fingers clearly extended (height check)
+        middle_tip = landmarks[12]
+        middle_mcp = landmarks[9]
+        ring_tip = landmarks[16]
+        ring_mcp = landmarks[13]
+        pinky_tip = landmarks[20]
+        pinky_mcp = landmarks[17]
+
+        extensions = [
+            middle_mcp['y'] - middle_tip['y'],
+            ring_mcp['y'] - ring_tip['y'],
+            pinky_mcp['y'] - pinky_tip['y'],
+        ]
+        if all(ext > 0.08 for ext in extensions):
+            confidence += 0.15
+        elif all(ext > 0.05 for ext in extensions):
+            confidence += 0.08
+
+        return min(confidence, 1.0)
+
+    def rock_sign_confidence(self, hand_data: Optional[Dict]) -> float:
+        """
+        Calculate confidence score for rock sign gesture (0.0-1.0).
+
+        Scoring:
+        - Base 0.50: Index and pinky extended, middle and ring curled
+        - +0.15: Good spread between index and pinky
+        - +0.15: Middle and ring tightly curled
+        - +0.10: Thumb tucked
+        """
+        if hand_data is None:
+            return 0.0
+
+        landmarks = hand_data['landmarks']
+        confidence = 0.0
+
+        # Check finger states
+        index_ext = self.is_finger_extended(landmarks, 8, 6, 5)
+        pinky_ext = self.is_finger_extended(landmarks, 20, 18, 17)
+
+        middle_tip = landmarks[12]
+        middle_pip = landmarks[10]
+        ring_tip = landmarks[16]
+        ring_pip = landmarks[14]
+
+        middle_curled = middle_tip['y'] > middle_pip['y']
+        ring_curled = ring_tip['y'] > ring_pip['y']
+
+        # Base score
+        if index_ext and pinky_ext and middle_curled and ring_curled:
+            confidence = 0.50
+        else:
+            return 0.0
+
+        # Bonus: spread between index and pinky
+        index_tip = landmarks[8]
+        pinky_tip = landmarks[20]
+        spread = abs(index_tip['x'] - pinky_tip['x'])
+        if spread > 0.12:
+            confidence += 0.15
+        elif spread > 0.08:
+            confidence += 0.08
+
+        # Bonus: middle and ring tightly curled
+        middle_curl = middle_tip['y'] - middle_pip['y']
+        ring_curl = ring_tip['y'] - ring_pip['y']
+        if middle_curl > 0.04 and ring_curl > 0.04:
+            confidence += 0.15
+        elif middle_curl > 0.02 and ring_curl > 0.02:
+            confidence += 0.08
+
+        # Bonus: thumb tucked
+        thumb_tip = landmarks[4]
+        thumb_mcp = landmarks[2]
+        wrist = landmarks[0]
+        thumb_tucked = abs(thumb_tip['x'] - wrist['x']) < abs(thumb_mcp['x'] - wrist['x']) + 0.04
+        if thumb_tucked:
+            confidence += 0.10
+
+        return min(confidence, 1.0)
+
+    def shaka_confidence(self, hand_data: Optional[Dict]) -> float:
+        """
+        Calculate confidence score for shaka gesture (0.0-1.0).
+
+        Scoring:
+        - Base 0.50: Thumb horizontal + pinky extended + others curled
+        - +0.15: Thumb clearly horizontal (not vertical)
+        - +0.15: Index/middle/ring tightly curled
+        - +0.10: Pinky clearly extended
+        """
+        if hand_data is None:
+            return 0.0
+
+        landmarks = hand_data['landmarks']
+        confidence = 0.0
+
+        # Check thumb horizontal
+        thumb_tip = landmarks[4]
+        thumb_mcp = landmarks[2]
+        wrist = landmarks[0]
+
+        thumb_horizontal_ext = abs(thumb_tip['x'] - wrist['x']) > abs(thumb_mcp['x'] - wrist['x']) + 0.04
+        thumb_not_vertical = abs(thumb_tip['y'] - thumb_mcp['y']) < 0.12
+
+        # Check pinky extended
+        pinky_ext = self.is_finger_extended(landmarks, 20, 18, 17)
+
+        # Check others curled
+        index_tip = landmarks[8]
+        index_pip = landmarks[6]
+        middle_tip = landmarks[12]
+        middle_pip = landmarks[10]
+        ring_tip = landmarks[16]
+        ring_pip = landmarks[14]
+
+        index_curled = index_tip['y'] > index_pip['y']
+        middle_curled = middle_tip['y'] > middle_pip['y']
+        ring_curled = ring_tip['y'] > ring_pip['y']
+
+        # Base score
+        if (thumb_horizontal_ext and thumb_not_vertical and pinky_ext and
+                index_curled and middle_curled and ring_curled):
+            confidence = 0.50
+        else:
+            return 0.0
+
+        # Bonus: thumb clearly horizontal
+        thumb_vertical_ratio = abs(thumb_tip['y'] - thumb_mcp['y']) / max(abs(thumb_tip['x'] - thumb_mcp['x']), 0.01)
+        if thumb_vertical_ratio < 0.5:
+            confidence += 0.15
+        elif thumb_vertical_ratio < 0.8:
+            confidence += 0.08
+
+        # Bonus: tight curls
+        index_curl = index_tip['y'] - index_pip['y']
+        middle_curl = middle_tip['y'] - middle_pip['y']
+        ring_curl = ring_tip['y'] - ring_pip['y']
+        if index_curl > 0.03 and middle_curl > 0.03 and ring_curl > 0.03:
+            confidence += 0.15
+        elif index_curl > 0.02 and middle_curl > 0.02 and ring_curl > 0.02:
+            confidence += 0.08
+
+        # Bonus: pinky clearly extended
+        pinky_tip = landmarks[20]
+        pinky_mcp = landmarks[17]
+        pinky_extension = pinky_mcp['y'] - pinky_tip['y']
+        if pinky_extension > 0.08:
+            confidence += 0.10
+
+        return min(confidence, 1.0)
+
+    def three_fingers_confidence(self, hand_data: Optional[Dict]) -> float:
+        """
+        Calculate confidence score for three fingers gesture (0.0-1.0).
+
+        Scoring:
+        - Base 0.50: Index, middle, ring extended, pinky curled
+        - +0.20: Good height on extended fingers
+        - +0.15: Pinky clearly curled
+        """
+        if hand_data is None:
+            return 0.0
+
+        landmarks = hand_data['landmarks']
+        confidence = 0.0
+
+        # Check finger states
+        index_ext = self.is_finger_extended(landmarks, 8, 6, 5)
+        middle_ext = self.is_finger_extended(landmarks, 12, 10, 9)
+        ring_ext = self.is_finger_extended(landmarks, 16, 14, 13)
+
+        pinky_tip = landmarks[20]
+        pinky_pip = landmarks[18]
+        pinky_curled = pinky_tip['y'] > pinky_pip['y']
+
+        # Thumb neutral
+        thumb_tip = landmarks[4]
+        thumb_ip = landmarks[3]
+        thumb_neutral = thumb_tip['y'] >= thumb_ip['y'] - 0.02
+
+        # Base score
+        if index_ext and middle_ext and ring_ext and pinky_curled and thumb_neutral:
+            confidence = 0.50
+        else:
+            return 0.0
+
+        # Bonus: good height on extended fingers
+        index_tip = landmarks[8]
+        index_mcp = landmarks[5]
+        middle_tip = landmarks[12]
+        middle_mcp = landmarks[9]
+        ring_tip = landmarks[16]
+        ring_mcp = landmarks[13]
+
+        extensions = [
+            index_mcp['y'] - index_tip['y'],
+            middle_mcp['y'] - middle_tip['y'],
+            ring_mcp['y'] - ring_tip['y'],
+        ]
+        if all(ext > 0.10 for ext in extensions):
+            confidence += 0.20
+        elif all(ext > 0.06 for ext in extensions):
+            confidence += 0.10
+
+        # Bonus: pinky clearly curled
+        pinky_curl = pinky_tip['y'] - pinky_pip['y']
+        if pinky_curl > 0.04:
+            confidence += 0.15
+        elif pinky_curl > 0.02:
+            confidence += 0.08
+
+        return min(confidence, 1.0)
+
+    def four_fingers_confidence(self, hand_data: Optional[Dict]) -> float:
+        """
+        Calculate confidence score for four fingers gesture (0.0-1.0).
+
+        Scoring:
+        - Base 0.50: All four fingers extended, thumb tucked
+        - +0.20: Good height on all fingers
+        - +0.15: Thumb clearly tucked (not extended)
+        """
+        if hand_data is None:
+            return 0.0
+
+        landmarks = hand_data['landmarks']
+        confidence = 0.0
+
+        # Check all four fingers extended
+        index_ext = self.is_finger_extended(landmarks, 8, 6, 5)
+        middle_ext = self.is_finger_extended(landmarks, 12, 10, 9)
+        ring_ext = self.is_finger_extended(landmarks, 16, 14, 13)
+        pinky_ext = self.is_finger_extended(landmarks, 20, 18, 17)
+
+        # Thumb tucked
+        thumb_tip = landmarks[4]
+        thumb_mcp = landmarks[2]
+        wrist = landmarks[0]
+        thumb_tucked = abs(thumb_tip['x'] - wrist['x']) <= abs(thumb_mcp['x'] - wrist['x']) + 0.03
+
+        # Base score
+        if index_ext and middle_ext and ring_ext and pinky_ext and thumb_tucked:
+            confidence = 0.50
+        else:
+            return 0.0
+
+        # Bonus: good height on all fingers
+        index_tip = landmarks[8]
+        index_mcp = landmarks[5]
+        middle_tip = landmarks[12]
+        middle_mcp = landmarks[9]
+        ring_tip = landmarks[16]
+        ring_mcp = landmarks[13]
+        pinky_tip = landmarks[20]
+        pinky_mcp = landmarks[17]
+
+        extensions = [
+            index_mcp['y'] - index_tip['y'],
+            middle_mcp['y'] - middle_tip['y'],
+            ring_mcp['y'] - ring_tip['y'],
+            pinky_mcp['y'] - pinky_tip['y'],
+        ]
+        if all(ext > 0.10 for ext in extensions):
+            confidence += 0.20
+        elif all(ext > 0.06 for ext in extensions):
+            confidence += 0.10
+
+        # Bonus: thumb clearly tucked
+        thumb_tuck_margin = abs(thumb_mcp['x'] - wrist['x']) - abs(thumb_tip['x'] - wrist['x'])
+        if thumb_tuck_margin > 0.02:
+            confidence += 0.15
+        elif thumb_tuck_margin > 0:
+            confidence += 0.08
+
+        return min(confidence, 1.0)
+
     def recognize_with_confidence(self, hand_data: Optional[Dict]) -> Tuple[str, float]:
         """
         Recognize gesture and return confidence score.
@@ -774,6 +1310,11 @@ class CommandGestureRecognizer:
             self.GESTURE_THUMBS_UP: self.thumbs_up_confidence(hand_data),
             self.GESTURE_THUMBS_DOWN: self.thumbs_down_confidence(hand_data),
             self.GESTURE_POINTING: self.pointing_confidence(hand_data),
+            self.GESTURE_OK_SIGN: self.ok_sign_confidence(hand_data),
+            self.GESTURE_ROCK_SIGN: self.rock_sign_confidence(hand_data),
+            self.GESTURE_SHAKA: self.shaka_confidence(hand_data),
+            self.GESTURE_THREE_FINGERS: self.three_fingers_confidence(hand_data),
+            self.GESTURE_FOUR_FINGERS: self.four_fingers_confidence(hand_data),
         }
 
         # Find best match
