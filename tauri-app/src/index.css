@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/* Custom theme extending Tailwind */
+@theme {
+  /* Tokyo Night inspired colors */
+  --color-bg-primary: #1a1b26;
+  --color-bg-secondary: #24283b;
+  --color-bg-elevated: #414868;
+  --color-bg-overlay: rgba(26, 27, 38, 0.85);
+
+  --color-text-primary: #c0caf5;
+  --color-text-secondary: #a9b1d6;
+  --color-text-muted: #565f89;
+
+  --color-accent-blue: #7aa2f7;
+  --color-accent-purple: #bb9af7;
+  --color-accent-cyan: #7dcfff;
+  --color-accent-green: #9ece6a;
+  --color-accent-yellow: #e0af68;
+  --color-accent-red: #f7768e;
+  --color-accent-orange: #ff9e64;
+
+  --color-border-default: #3b4261;
+  --color-border-subtle: #292e42;
+
+  /* Status colors */
+  --color-clutch-engaged: #9ece6a;
+  --color-clutch-ready: #565f89;
+  --color-recording: #f7768e;
+
+  /* Gesture colors */
+  --color-gesture-palm: #bb9af7;
+  --color-gesture-peace: #7dcfff;
+  --color-gesture-thumbup: #9ece6a;
+  --color-gesture-thumbdown: #f7768e;
+  --color-gesture-point: #7aa2f7;
+  --color-gesture-ok: #e0af68;
+  --color-gesture-rock: #ff9e64;
+  --color-gesture-shaka: #7dcfff;
+  --color-gesture-three: #9ece6a;
+  --color-gesture-four: #bb9af7;
+}
+
+/* Base styles */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(36, 40, 59, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border-default);
+}
+
+.glass-dark {
+  background: rgba(26, 27, 38, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border-subtle);
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 20px currentColor; }
+  50% { opacity: 0.6; box-shadow: 0 0 10px currentColor; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
