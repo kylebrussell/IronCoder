@@ -18,8 +18,8 @@ export function StatusPill() {
     if (!clutch.engaged) {
       return {
         text: 'READY',
-        bgClass: 'bg-bg-elevated/80',
-        textClass: 'text-text-muted',
+        bgClass: 'bg-bg-primary/90',
+        textClass: 'text-text-secondary',
         borderClass: 'border-border-default',
       };
     }
@@ -61,11 +61,14 @@ export function StatusPill() {
             px-4 py-2 rounded-full
             ${config.bgClass}
             border ${config.borderClass}
-            backdrop-blur-md
-            shadow-lg
+            backdrop-blur-xl
+            shadow-lg shadow-black/30
           `}
         >
-          <span className={`text-sm font-semibold tracking-wide ${config.textClass}`}>
+          <span
+            className={`text-sm font-semibold tracking-wide ${config.textClass}`}
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+          >
             {config.text}
           </span>
         </motion.div>
