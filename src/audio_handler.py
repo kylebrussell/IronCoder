@@ -6,6 +6,7 @@ Records audio in background thread and provides streaming transcription.
 import threading
 import queue
 import time
+import re
 import numpy as np
 import sounddevice as sd
 from faster_whisper import WhisperModel
@@ -13,6 +14,42 @@ from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Common Whisper hallucination artifacts to filter out
+# These often appear when audio cuts off or has silence
+WHISPER_ARTIFACTS = [
+    r'\s+you\.?$',           # Trailing "you" or "you."
+    r'\s+you\s*$',           # Trailing "you" with whitespace
+    r'^you\s+',              # Leading "you"
+    r'\s+thank you\.?$',     # Trailing "thank you"
+    r'\s+thanks\.?$',        # Trailing "thanks"
+    r'^\s*you\s*$',          # Just "you" by itself
+    r'\s+bye\.?$',           # Trailing "bye"
+]
+
+def clean_transcription(text: str) -> str:
+    """
+    Clean up common Whisper transcription artifacts.
+
+    Args:
+        text: Raw transcription text
+
+    Returns:
+        Cleaned text with artifacts removed
+    """
+    if not text:
+        return text
+
+    cleaned = text.strip()
+
+    # Apply artifact filters
+    for pattern in WHISPER_ARTIFACTS:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+    # Clean up any double spaces left behind
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+    return cleaned
 
 
 class AudioHandler:
@@ -187,7 +224,10 @@ class AudioHandler:
             text_parts = [segment.text for segment in segments]
             text = " ".join(text_parts).strip()
 
-            logger.info(f"🎙️  Whisper returned: '{text}'")
+            logger.info(f"🎙️  Whisper raw: '{text}'")
+
+            # Clean up common Whisper artifacts
+            text = clean_transcription(text)
 
             # Only queue non-empty transcriptions
             if text:
@@ -221,6 +261,9 @@ class AudioHandler:
             )
             text_parts = [segment.text for segment in segments]
             text = " ".join(text_parts).strip()
+
+            # Clean up common Whisper artifacts
+            text = clean_transcription(text)
 
             if text:
                 self.text_queue.put(text)

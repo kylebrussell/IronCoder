@@ -6,7 +6,8 @@ A macOS utility that combines AI-powered gesture recognition and voice transcrip
 
 ## Features
 
-- **AI-Powered Gestures**: Google Gemini Vision API for reliable gesture detection
+- **Hybrid Gesture Detection**: Fast local detection with optional Gemini fallback
+- **Low Latency**: ~100-200ms gesture response (vs 2-3s with API-only)
 - **Voice Input**: Push-to-talk with real-time Whisper transcription
 - **Dual-Hand System**: Left hand clutch + right hand gestures
 - **Beautiful UI**: Modern card-based overlay with color-coded controls
@@ -119,11 +120,22 @@ settings:
   camera_resolution: [640, 480]
   camera_fps: 20
 
+# Hybrid detection: fast local + optional Gemini fallback
+hybrid_detection:
+  use_gemini_fallback: false    # Set true for Gemini verification
+  gestures:
+    open_palm:
+      stability_frames: 2       # Frames needed (2 = ~100ms)
+      skip_gemini_above: 0.75   # Confidence threshold
+    peace_sign:
+      stability_frames: 4
+      skip_gemini_above: 0.85
+    # ... other gestures
+
 gemini:
-  model: gemini-2.5-flash       # Gemini model to use
+  model: gemini-2.5-flash       # Gemini model (for fallback)
   sample_interval: 0.5          # Seconds between API calls
-  stability_frames: 2           # Consecutive detections needed
-  resize_width: 512             # Image width sent to API
+  resize_width: 256             # Image width sent to API
 ```
 
 ## Architecture
@@ -131,9 +143,11 @@ gemini:
 ```
 Webcam Feed
     ↓
-MediaPipe Hand Tracking (Clutch Detection)
-    ↓
-Google Gemini Vision API (Gesture Recognition)
+MediaPipe Hand Tracking
+    ├─→ Left Hand → Clutch Detection
+    └─→ Right Hand → Hybrid Gesture Detector
+                         ├─→ Local Detection (fast, ~1ms)
+                         └─→ Gemini Fallback (optional)
     ↓
 Action Handler
     ├─→ Whisper AI (Voice Transcription)
@@ -142,28 +156,30 @@ Action Handler
 
 ### Key Components
 
-- **HandTracker**: MediaPipe wrapper for clutch detection
+- **HandTracker**: MediaPipe wrapper for hand landmark detection
 - **ClutchDetector**: Detects closed fist on left hand
-- **GeminiGestureDetector**: AI-powered gesture recognition using Gemini Vision
-- **AudioHandler**: Real-time audio recording and Whisper transcription
+- **HybridGestureDetector**: Fast local detection with optional Gemini fallback
+- **CommandGestureRecognizer**: Geometric landmark-based gesture detection with confidence scoring
+- **AudioHandler**: Real-time audio recording and Whisper transcription (with artifact filtering)
 - **ActionHandler**: Executes commands and manages voice input
-- **VisualFeedback**: Beautiful card-based UI overlay
+- **VisualFeedback**: Card-based UI overlay
 
 ### Technology Stack
 
-- **[Google Gemini Vision API](https://ai.google.dev/)** - Gesture detection
+- **[MediaPipe](https://mediapipe.dev/)** - Hand tracking and landmark detection
+- **[Google Gemini Vision API](https://ai.google.dev/)** - Optional gesture verification
 - **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** - Speech-to-text
-- **[MediaPipe](https://mediapipe.dev/)** - Hand tracking for clutch
 - **[OpenCV](https://opencv.org/)** - Computer vision
 - **[PyAutoGUI](https://pyautogui.readthedocs.io/)** - Keyboard automation
 
 ## Safety Features
 
 1. **Clutch Mechanism**: Gestures only work when left fist is closed
-2. **Frame Smoothing**: Requires stable gesture over multiple frames
-3. **Cooldown Period**: Prevents rapid double-triggers
-4. **Hand Loss Reset**: Resets state when hands leave frame
-5. **API Rate Limiting**: Gemini calls throttled to 0.5s intervals
+2. **Confidence Scoring**: Each gesture has a confidence threshold (0.0-1.0)
+3. **Frame Stability**: Requires consistent detection over multiple frames
+4. **Cooldown Period**: Prevents rapid double-triggers
+5. **Hand Loss Reset**: Resets state when hands leave frame
+6. **Strict Gesture Discrimination**: Gestures require clear, distinct hand positions
 
 ## Troubleshooting
 
@@ -190,13 +206,17 @@ Action Handler
 ### Poor Gesture Detection
 - Improve lighting conditions
 - Make gestures clearly and deliberately
-- Reduce `gemini.sample_interval` for faster detection
-- Decrease `gemini.stability_frames` for quicker response
+- Try reducing `stability_frames` in hybrid_detection config
+- Ensure hand is fully visible in camera frame
+
+### Gestures Triggering Too Easily
+- Increase `stability_frames` for problematic gestures
+- Increase `skip_gemini_above` threshold (e.g., 0.90)
+- Make more deliberate, exaggerated gestures
 
 ### High CPU Usage
 - Lower camera resolution in config
 - Reduce camera FPS
-- Increase `gemini.sample_interval` (fewer API calls)
 - Close other applications
 
 ## Project Structure
@@ -210,12 +230,14 @@ gesture-control-claude/
 ├── src/
 │   ├── hand_tracker.py             # MediaPipe hand tracking
 │   ├── clutch_detector.py          # Left hand clutch detection
-│   ├── gemini_gesture_detector.py  # Gemini-powered gesture recognition
-│   ├── audio_handler.py            # Whisper audio transcription
+│   ├── hybrid_gesture_detector.py  # Fast local + Gemini fallback
+│   ├── gesture_recognizer.py       # Geometric gesture detection with confidence
+│   ├── gemini_gesture_detector.py  # Gemini Vision API integration
+│   ├── audio_handler.py            # Whisper transcription + artifact filtering
 │   ├── action_handler.py           # Command execution
 │   └── utils/
 │       ├── window_manager.py       # Window focus detection
-│       └── visual_feedback.py      # Beautiful UI overlays
+│       └── visual_feedback.py      # UI overlays
 └── README.md
 ```
 
@@ -233,16 +255,19 @@ gesture-control-claude/
 
 ### Adding New Gestures
 
-1. Add gesture description to `GeminiGestureDetector.GESTURES`
-2. Add action method to `ActionHandler`
-3. Map gesture to action in `action_handler.py`
-4. Update `config.yaml` gesture mappings
-5. Update visual feedback hints in `visual_feedback.py`
+1. Add detection method to `gesture_recognizer.py` (e.g., `detect_new_gesture()`)
+2. Add confidence method (e.g., `new_gesture_confidence()`)
+3. Add to `recognize_gesture()` and `recognize_with_confidence()`
+4. Add gesture config to `hybrid_gesture_detector.py` DEFAULT_GESTURE_CONFIG
+5. Add action method to `ActionHandler`
+6. Update `config.yaml` gesture mappings and hybrid_detection settings
+7. Update visual feedback hints in `visual_feedback.py`
 
 ### Performance Optimization
 
 - Camera: 640x480 @ 20fps (balances accuracy and performance)
-- Gemini: 0.5s intervals with 512px images (manages API costs)
+- Local detection: ~1ms per frame (geometric landmark analysis)
+- Stability frames: 2-4 frames = 100-200ms response time
 - Whisper: int8 quantization for faster inference
 - MediaPipe: 0.7 confidence threshold (filters noise)
 

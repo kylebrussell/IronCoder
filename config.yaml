@@ -22,9 +22,30 @@ visual_feedback:
   clutch_indicator_color: [0, 255, 0]  # Green when engaged
   clutch_disengaged_color: [255, 0, 0]  # Red when disengaged
 
-# Gemini Vision API settings for gesture detection
+# Hybrid gesture detection settings
+# Uses fast local detection with optional Gemini fallback for low-confidence cases
+hybrid_detection:
+  use_gemini_fallback: false  # Disabled - local detection is fast and reliable
+  gestures:
+    open_palm:
+      stability_frames: 2      # Fastest - 100ms at 20fps (for push-to-talk)
+      skip_gemini_above: 0.75  # Lower threshold for speed priority
+    peace_sign:
+      stability_frames: 4      # Extra stability to prevent accidental triggers
+      skip_gemini_above: 0.85  # Higher threshold
+    thumbs_up:
+      stability_frames: 4
+      skip_gemini_above: 0.85
+    thumbs_down:
+      stability_frames: 4
+      skip_gemini_above: 0.85
+    pointing:
+      stability_frames: 4
+      skip_gemini_above: 0.85
+
+# Gemini Vision API settings (used for fallback verification only)
 gemini:
   model: gemini-2.5-flash  # Latest fast vision model
-  sample_interval: 0.5  # Send frame to Gemini every 0.5 seconds
-  stability_frames: 2  # Require 2 consecutive detections before confirming gesture
-  resize_width: 512  # Resize frame width before sending (saves API costs)
+  sample_interval: 0.5  # Only used for fallback verification
+  stability_frames: 1  # Single verification, no stability needed for fallback
+  resize_width: 256  # Smaller for faster fallback (256px instead of 512px)

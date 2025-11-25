@@ -267,3 +267,133 @@ Gesture:"""
         self.current_gesture = None
         self.gesture_history = []
         logger.debug("Gesture detector reset")
+
+    def get_current_gesture(self) -> Optional[str]:
+        """Get the current detected gesture."""
+        return self.current_gesture
+
+    # ============================================================
+    # Quick Verification Methods for Hybrid Detection Fallback
+    # ============================================================
+
+    def _crop_hand_region(
+        self,
+        frame: np.ndarray,
+        landmarks: list,
+        padding: float = 0.2
+    ) -> np.ndarray:
+        """
+        Crop frame to just the hand region for faster/cheaper API calls.
+
+        Args:
+            frame: Full OpenCV frame
+            landmarks: List of hand landmark dicts with 'x', 'y' keys (normalized 0-1)
+            padding: Padding around hand region as fraction of frame size
+
+        Returns:
+            Cropped frame containing just the hand
+        """
+        h, w = frame.shape[:2]
+
+        # Get bounding box from landmarks
+        xs = [l['x'] for l in landmarks]
+        ys = [l['y'] for l in landmarks]
+
+        # Convert to pixel coordinates with padding
+        pad_w = int(padding * w)
+        pad_h = int(padding * h)
+
+        x_min = int(max(0, min(xs) * w - pad_w))
+        x_max = int(min(w, max(xs) * w + pad_w))
+        y_min = int(max(0, min(ys) * h - pad_h))
+        y_max = int(min(h, max(ys) * h + pad_h))
+
+        # Ensure we have a valid region
+        if x_max <= x_min or y_max <= y_min:
+            return frame
+
+        return frame[y_min:y_max, x_min:x_max]
+
+    def _resize_to_max_dim(self, frame: np.ndarray, max_dim: int = 256) -> np.ndarray:
+        """
+        Resize frame so largest dimension is max_dim.
+        Smaller images = faster API calls.
+
+        Args:
+            frame: OpenCV frame
+            max_dim: Maximum dimension in pixels
+
+        Returns:
+            Resized frame
+        """
+        h, w = frame.shape[:2]
+        if max(h, w) <= max_dim:
+            return frame
+
+        if w > h:
+            new_w = max_dim
+            new_h = int(h * max_dim / w)
+        else:
+            new_h = max_dim
+            new_w = int(w * max_dim / h)
+
+        return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+    def verify_gesture_quick(
+        self,
+        frame: np.ndarray,
+        suspected_gesture: str,
+        landmarks: Optional[list] = None
+    ) -> bool:
+        """
+        Quick verification of a suspected gesture.
+        Uses smaller image and simpler prompt for faster response.
+
+        Args:
+            frame: Current video frame
+            suspected_gesture: What local detection thinks it is
+            landmarks: Optional hand landmarks for cropping
+
+        Returns:
+            True if Gemini confirms the gesture
+        """
+        try:
+            # Crop to hand region if landmarks provided (much smaller image)
+            if landmarks:
+                frame = self._crop_hand_region(frame, landmarks)
+
+            # Resize to small dimension for speed
+            small = self._resize_to_max_dim(frame, 256)
+
+            # Encode as JPEG with lower quality for speed
+            success, buffer = cv2.imencode('.jpg', small, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            if not success:
+                return False
+            jpeg_bytes = buffer.tobytes()
+
+            # Simple yes/no verification prompt
+            gesture_desc = self.GESTURES.get(suspected_gesture, suspected_gesture)
+            verify_prompt = (
+                f"Is the right hand making a {suspected_gesture.replace('_', ' ')} gesture "
+                f"({gesture_desc})? Answer ONLY 'yes' or 'no'."
+            )
+
+            logger.debug(f"Quick verify: {suspected_gesture}")
+
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[
+                    types.Part.from_bytes(data=jpeg_bytes, mime_type='image/jpeg'),
+                    verify_prompt
+                ]
+            )
+
+            answer = response.text.strip().lower()
+            confirmed = answer.startswith('yes')
+
+            logger.debug(f"Gemini verify response: '{answer}' -> {confirmed}")
+            return confirmed
+
+        except Exception as e:
+            logger.warning(f"Gemini quick verification failed: {e}")
+            return False  # Default to not verified on error

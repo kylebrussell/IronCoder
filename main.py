@@ -1,6 +1,8 @@
 """
 IronCoder Gesture Control for Claude Code
 Main entry point for the gesture control system.
+
+Uses hybrid gesture detection: fast local detection with optional Gemini fallback.
 """
 import cv2
 import yaml
@@ -8,6 +10,7 @@ import logging
 from dotenv import load_dotenv
 from src.hand_tracker import HandTracker
 from src.clutch_detector import ClutchDetector
+from src.hybrid_gesture_detector import HybridGestureDetector
 from src.gemini_gesture_detector import GeminiGestureDetector
 from src.action_handler import ActionHandler
 from src.utils.window_manager import WindowManager
@@ -50,11 +53,15 @@ def main():
     require_stable_frames = config.get('clutch', {}).get('require_stable_frames', 5)
     show_overlay = config.get('visual_feedback', {}).get('show_overlay', True)
 
-    # Gemini settings
+    # Gemini settings (for fallback)
     gemini_model = config.get('gemini', {}).get('model', 'gemini-2.0-flash-exp')
     gemini_sample_interval = config.get('gemini', {}).get('sample_interval', 0.5)
     gemini_stability_frames = config.get('gemini', {}).get('stability_frames', 2)
     gemini_resize_width = config.get('gemini', {}).get('resize_width', 512)
+
+    # Hybrid detection settings
+    use_gemini_fallback = config.get('hybrid_detection', {}).get('use_gemini_fallback', True)
+    gesture_config = config.get('hybrid_detection', {}).get('gestures', {})
 
     # Get visual feedback colors
     clutch_engaged_color = tuple(config.get('visual_feedback', {}).get('clutch_indicator_color', [0, 255, 0]))
@@ -66,8 +73,7 @@ def main():
     logger.info(f"Cooldown: {cooldown_ms}ms")
     logger.info(f"Require terminal focus: {require_terminal_focus}")
     logger.info(f"Clutch stable frames: {require_stable_frames}")
-    logger.info(f"Gemini model: {gemini_model}")
-    logger.info(f"Gemini sample interval: {gemini_sample_interval}s")
+    logger.info(f"Hybrid detection with Gemini fallback: {use_gemini_fallback}")
 
     # Initialize components
     hand_tracker = HandTracker(
@@ -76,20 +82,30 @@ def main():
     )
     clutch_detector = ClutchDetector(require_stable_frames=require_stable_frames)
 
-    # Initialize Gemini gesture detector
-    try:
-        gesture_detector = GeminiGestureDetector(
-            model_name=gemini_model,
-            sample_interval=gemini_sample_interval,
-            stability_frames=gemini_stability_frames,
-            cooldown_ms=cooldown_ms,
-            resize_width=gemini_resize_width
-        )
-        logger.info("Gemini gesture detector initialized")
-    except ValueError as e:
-        logger.error(f"Failed to initialize Gemini: {e}")
-        logger.error("Make sure GEMINI_API_KEY environment variable is set")
-        return
+    # Initialize Gemini detector for fallback (optional)
+    gemini_fallback = None
+    if use_gemini_fallback:
+        try:
+            gemini_fallback = GeminiGestureDetector(
+                model_name=gemini_model,
+                sample_interval=gemini_sample_interval,
+                stability_frames=1,  # Single verification, no stability needed
+                cooldown_ms=cooldown_ms,
+                resize_width=256  # Smaller for fallback speed
+            )
+            logger.info(f"Gemini fallback initialized (model: {gemini_model})")
+        except ValueError as e:
+            logger.warning(f"Gemini fallback unavailable: {e}")
+            logger.info("Continuing with local-only detection")
+
+    # Initialize hybrid gesture detector
+    gesture_detector = HybridGestureDetector(
+        gemini_detector=gemini_fallback,
+        cooldown_ms=cooldown_ms,
+        use_gemini_fallback=use_gemini_fallback and gemini_fallback is not None,
+        gesture_config=gesture_config
+    )
+    logger.info("Hybrid gesture detector initialized (fast local + optional Gemini fallback)")
 
     action_handler = ActionHandler()
     window_manager = WindowManager()
@@ -140,19 +156,22 @@ def main():
             # Only process gestures if clutch is engaged
             triggered_gesture = None
             current_gesture = None
+            detection_source = None
             if clutch_engaged:
                 # Check if terminal is focused (if required)
                 terminal_focused = not require_terminal_focus or window_manager.is_terminal_active()
 
                 if not terminal_focused:
-                    logger.info("🖥️  Terminal not focused - gestures disabled (set require_terminal_focus: false in config to disable this check)")
+                    logger.debug("Terminal not focused - gestures disabled")
                 else:
-                    # Update Gemini gesture detector with full frame
-                    # (Gemini needs the image, not just hand landmarks)
-                    triggered_gesture = gesture_detector.update(frame)
+                    # Update hybrid gesture detector with frame and right hand data
+                    result = gesture_detector.update(frame, right_hand)
+
+                    if result:
+                        triggered_gesture, confidence, detection_source = result
 
                     # Get current gesture state (not just newly triggered)
-                    current_gesture = gesture_detector.get_status()['current_gesture']
+                    current_gesture = gesture_detector.get_current_gesture()
 
                     # Handle push-to-talk for open_palm gesture
                     if current_gesture == 'open_palm' and previous_gesture != 'open_palm':
@@ -167,10 +186,12 @@ def main():
                         action_feedback_timer = 0
 
                     # Execute action if non-voice gesture was triggered
-                    if triggered_gesture and triggered_gesture != 'open_palm':
+                    if triggered_gesture and triggered_gesture not in ['open_palm', 'none']:
                         action_text = action_handler.execute_gesture_action(triggered_gesture)
                         if action_text:
-                            action_feedback_text = action_text
+                            # Show source (local/gemini) in feedback
+                            source_indicator = "fast" if detection_source == 'local' else "verified"
+                            action_feedback_text = f"{action_text} ({source_indicator})"
                             action_feedback_timer = 60  # Show for 60 frames (~2 seconds at 30fps)
             else:
                 # Reset gesture detector when clutch is disengaged
@@ -197,7 +218,8 @@ def main():
                 visual_feedback.draw_clutch_indicator(processed_frame, clutch_engaged)
 
                 # Draw status text
-                status_gesture = gesture_detector.get_status()['current_gesture']
+                status = gesture_detector.get_status()
+                status_gesture = status.get('current_gesture')
                 visual_feedback.draw_status_text(
                     processed_frame,
                     clutch_engaged,
