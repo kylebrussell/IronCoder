@@ -32,7 +32,7 @@ gestures:
     description: Explain Code
   four_fingers:
     command: /usage
-    description: Show Cost
+    description: Check Session Usage
 command_presets:
   claude_commands:
   - /help
